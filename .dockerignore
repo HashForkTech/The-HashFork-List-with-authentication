@@ -1,0 +1,10 @@
+# Keep the build context clean: `COPY . .` must never drag in the host's
+# node_modules (it would overwrite the deps-stage install), a stale .next
+# build, or the real SQLite database (which must not be baked into images).
+node_modules
+.next
+.git
+data
+.env
+*.log
+tsconfig.tsbuildinfo

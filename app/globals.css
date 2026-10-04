@@ -1,0 +1,107 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Visual identity: #141414 background, #dedede foreground. Every other tone
+   is an opacity variation of those two colors.
+   ────────────────────────────────────────────────────────────────────────── */
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    scrollbar-color: rgba(222, 222, 222, 0.25) transparent;
+  }
+
+  body {
+    background-color: #141414;
+    color: #dedede;
+    text-rendering: optimizeLegibility;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  ::selection {
+    background-color: rgba(222, 222, 222, 0.22);
+    color: #dedede;
+  }
+
+  :focus-visible {
+    outline: 2px solid rgba(222, 222, 222, 0.85);
+    outline-offset: 2px;
+  }
+
+  /* Never allow content to force horizontal scrolling on small screens. */
+  body {
+    overflow-x: hidden;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-sm border border-paper/20 px-3 py-2 text-sm font-medium text-paper/85 transition-colors duration-150 hover:border-paper/50 hover:bg-paper/5 hover:text-paper disabled:cursor-not-allowed disabled:opacity-40;
+  }
+
+  .btn-primary {
+    @apply border-paper bg-paper text-ink hover:border-paper hover:bg-paper hover:text-ink;
+  }
+
+  /* Destructive actions: visually distinct through inversion on hover. */
+  .btn-danger {
+    @apply border-paper/35 text-paper/80 hover:border-paper hover:bg-paper hover:text-ink;
+  }
+
+  .btn-ghost {
+    @apply border-transparent px-2.5 py-1.5 text-paper/65 hover:border-transparent hover:bg-paper/5 hover:text-paper;
+  }
+
+  .btn-icon {
+    @apply inline-flex h-11 w-11 items-center justify-center rounded-sm text-paper/60 transition-colors duration-150 hover:bg-paper/5 hover:text-paper sm:h-9 sm:w-9;
+  }
+
+  .field-label {
+    @apply mb-1.5 block text-[11px] font-medium uppercase tracking-[0.14em] text-paper/50;
+  }
+
+  .field-input {
+    @apply w-full rounded-sm border border-paper/15 bg-paper/[0.04] px-3 py-2.5 text-sm text-paper transition-colors duration-150 placeholder:text-paper/25 hover:border-paper/25 focus:border-paper/50 focus:outline-none;
+  }
+
+  .field-hint {
+    @apply mt-1.5 text-xs leading-relaxed text-paper/40;
+  }
+
+  .field-error {
+    @apply mt-1.5 text-xs leading-relaxed text-paper/75;
+  }
+
+  .panel {
+    @apply rounded-sm border border-paper/10 bg-paper/[0.02];
+  }
+
+  .section-title {
+    @apply text-[11px] font-medium uppercase tracking-[0.18em] text-paper/45;
+  }
+}
+
+@layer utilities {
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Respect users who prefer reduced motion (spec §39). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

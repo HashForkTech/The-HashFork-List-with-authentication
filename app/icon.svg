@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="The Hashfork List">
+  <rect width="64" height="64" rx="10" fill="#141414" />
+  <g fill="#dedede">
+    <rect x="20" y="16" width="5" height="32" rx="2" transform="rotate(8 22.5 32)" />
+    <rect x="38" y="16" width="5" height="32" rx="2" transform="rotate(8 40.5 32)" />
+    <rect x="14" y="25" width="36" height="5" rx="2" transform="rotate(8 32 27.5)" />
+    <rect x="14" y="37" width="36" height="5" rx="2" transform="rotate(8 32 39.5)" />
+  </g>
+</svg>
