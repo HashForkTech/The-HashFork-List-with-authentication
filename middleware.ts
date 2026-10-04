@@ -36,7 +36,21 @@ function buildCsp(): string {
 
 const CSP = buildCsp();
 
-export function middleware(_request: NextRequest) {
+/**
+ * True when the request is served over a "potentially trustworthy" origin.
+ * Behind a TLS-terminating proxy the original scheme arrives in
+ * X-Forwarded-Proto; direct requests report it through the URL protocol.
+ */
+function isSecureOrigin(request: NextRequest): boolean {
+  const forwarded = request.headers
+    .get('x-forwarded-proto')
+    ?.split(',')[0]
+    ?.trim();
+  if (forwarded) return forwarded === 'https';
+  return request.nextUrl.protocol === 'https:';
+}
+
+export function middleware(request: NextRequest) {
   const response = NextResponse.next();
 
   response.headers.set('content-security-policy', CSP);
@@ -47,8 +61,14 @@ export function middleware(_request: NextRequest) {
     'permissions-policy',
     'camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()',
   );
-  response.headers.set('cross-origin-opener-policy', 'same-origin');
-  response.headers.set('cross-origin-resource-policy', 'same-origin');
+
+  // COOP/CORP are only honored on secure origins: sending them over plain
+  // HTTP just makes every browser log an "ignored header" console error on
+  // every page load (this app is explicitly designed to run without TLS).
+  if (isSecureOrigin(request)) {
+    response.headers.set('cross-origin-opener-policy', 'same-origin');
+    response.headers.set('cross-origin-resource-policy', 'same-origin');
+  }
 
   // HSTS is strictly opt-in: the app works fine over plain HTTP (no cookies,
   // no authentication), so TLS is never required.

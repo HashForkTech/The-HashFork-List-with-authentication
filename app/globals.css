@@ -30,9 +30,11 @@
     outline-offset: 2px;
   }
 
-  /* Never allow content to force horizontal scrolling on small screens. */
-  body {
-    overflow-x: hidden;
+  /* Deep links to a row (`#item-<id>`) get a brief, self-evident highlight. */
+  [data-item-row]:target {
+    background-color: rgba(222, 222, 222, 0.07);
+    outline: 1px solid rgba(222, 222, 222, 0.3);
+    outline-offset: -1px;
   }
 }
 
@@ -55,23 +57,23 @@
   }
 
   .btn-icon {
-    @apply inline-flex h-11 w-11 items-center justify-center rounded-sm text-paper/60 transition-colors duration-150 hover:bg-paper/5 hover:text-paper sm:h-9 sm:w-9;
+    @apply inline-flex h-11 w-11 items-center justify-center rounded-sm text-paper/70 transition-colors duration-150 hover:bg-paper/5 hover:text-paper sm:h-9 sm:w-9;
   }
 
   .field-label {
-    @apply mb-1.5 block text-[11px] font-medium uppercase tracking-[0.14em] text-paper/50;
+    @apply mb-1.5 block text-[11px] font-medium uppercase tracking-[0.14em] text-paper/65;
   }
 
   .field-input {
-    @apply w-full rounded-sm border border-paper/15 bg-paper/[0.04] px-3 py-2.5 text-sm text-paper transition-colors duration-150 placeholder:text-paper/25 hover:border-paper/25 focus:border-paper/50 focus:outline-none;
+    @apply w-full rounded-sm border border-paper/20 bg-paper/[0.04] px-3 py-2.5 text-sm text-paper transition-colors duration-150 placeholder:text-paper/45 hover:border-paper/30 focus:border-paper/55 focus:outline-none;
   }
 
   .field-hint {
-    @apply mt-1.5 text-xs leading-relaxed text-paper/40;
+    @apply mt-1.5 text-xs leading-relaxed text-paper/60;
   }
 
   .field-error {
-    @apply mt-1.5 text-xs leading-relaxed text-paper/75;
+    @apply mt-1.5 text-xs leading-relaxed text-paper/85;
   }
 
   .panel {
@@ -79,7 +81,7 @@
   }
 
   .section-title {
-    @apply text-[11px] font-medium uppercase tracking-[0.18em] text-paper/45;
+    @apply text-[11px] font-medium uppercase tracking-[0.18em] text-paper/60;
   }
 }
 

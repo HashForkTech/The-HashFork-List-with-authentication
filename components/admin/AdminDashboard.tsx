@@ -41,10 +41,14 @@ function StarRow({ rating }: { rating: number }) {
       role="img"
       aria-label={`Rated ${rating} out of 5 stars`}
     >
-      {Array.from({ length: rating }, (_, index) => (
+      {Array.from({ length: 5 }, (_, index) => (
         <Star
           key={index}
-          className="h-3 w-3 fill-yellow-400 text-yellow-400"
+          className={
+            index < rating
+              ? 'h-3 w-3 fill-yellow-400 text-yellow-400'
+              : 'h-3 w-3 text-paper/25'
+          }
           aria-hidden="true"
         />
       ))}
@@ -390,7 +394,7 @@ export function AdminDashboard({
           <p>
             “{label}” will be permanently removed from the list.
           </p>
-          <p className="mt-2 text-paper/50">
+          <p className="mt-2 text-paper/60">
             This action cannot be undone (except by restoring a backup).
           </p>
         </>
@@ -421,13 +425,13 @@ export function AdminDashboard({
 
   return (
     <AdminLayout guardLeave={guardNavigation}>
-      <main className="mx-auto w-full max-w-content px-4 pb-24 sm:px-6">
+      <main id="main-content" className="mx-auto w-full max-w-content px-4 pb-24 sm:px-6">
         <div className="py-6">
           <p className="section-title">Administration</p>
           <h1 className="mt-1.5 text-2xl font-semibold tracking-tight text-paper">
             Dashboard
           </h1>
-          <p className="mt-1.5 text-xs text-paper/35">
+          <p className="mt-1.5 text-xs text-paper/60">
             Password-free area (no SSL certificate required). If this instance is exposed to
             untrusted people, protect /admin and /api at the server level — see README.
           </p>
@@ -449,7 +453,7 @@ export function AdminDashboard({
         ) : null}
 
         {/* ------------------------------ main page ---------------------------- */}
-        <section aria-labelledby="main-page-title" className="mt-10">
+        <section aria-labelledby="main-page-title" className="mt-12">
           <h2 id="main-page-title" className="section-title">
             Main page
           </h2>
@@ -488,7 +492,7 @@ export function AdminDashboard({
         </section>
 
         {/* ------------------------------ categories ---------------------------- */}
-        <section aria-labelledby="categories-title" className="mt-10">
+        <section aria-labelledby="categories-title" className="mt-12">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 id="categories-title" className="section-title">
               Categories
@@ -554,7 +558,7 @@ export function AdminDashboard({
           ) : null}
 
           {categories.length === 0 ? (
-            <p className="panel mt-4 px-4 py-8 text-center text-sm text-paper/45">
+            <p className="panel mt-4 px-4 py-8 text-center text-sm text-paper/60">
               No categories yet. The public list also works without categories.
             </p>
           ) : (
@@ -605,7 +609,7 @@ export function AdminDashboard({
                       <span className="min-w-0 flex-1 break-words text-sm font-medium text-paper">
                         {category.name}
                       </span>
-                      <span className="shrink-0 text-xs text-paper/40">
+                      <span className="shrink-0 text-xs text-paper/60">
                         {category.itemCount} resource{category.itemCount === 1 ? '' : 's'}
                       </span>
                       <div className="flex shrink-0 gap-2">
@@ -683,11 +687,11 @@ export function AdminDashboard({
           ) : null}
 
           {items.length === 0 ? (
-            <p className="panel mt-4 px-4 py-8 text-center text-sm text-paper/45">
+            <p className="panel mt-4 px-4 py-8 text-center text-sm text-paper/60">
               No resources added yet.
             </p>
           ) : filteredItems.length === 0 ? (
-            <p className="panel mt-4 px-4 py-8 text-center text-sm text-paper/45">
+            <p className="panel mt-4 px-4 py-8 text-center text-sm text-paper/60">
               No resources match the selected filters.
             </p>
           ) : (
@@ -706,30 +710,30 @@ export function AdminDashboard({
                       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
                         <h3 className="min-w-0 break-words text-base font-medium tracking-tight text-paper">
                           {item.name?.trim() || (
-                            <span className="font-normal italic text-paper/40">
+                            <span className="font-normal italic text-paper/55">
                               Unnamed resource
                             </span>
                           )}
                         </h3>
                         {category ? (
-                          <span className="shrink-0 rounded-sm border border-paper/15 px-2 py-0.5 text-[11px] text-paper/55">
+                          <span className="shrink-0 rounded-sm border border-paper/15 px-2 py-0.5 text-[11px] text-paper/65">
                             {category.name}
                           </span>
                         ) : null}
                         {item.tested ? (
-                          <span className="shrink-0 rounded-sm border border-paper/15 px-2 py-0.5 text-[11px] text-paper/55">
+                          <span className="shrink-0 rounded-sm border border-paper/15 px-2 py-0.5 text-[11px] text-paper/65">
                             Tested
                           </span>
                         ) : null}
                         {rating > 0 ? <StarRow rating={rating} /> : null}
                       </div>
                       {item.description?.trim() ? (
-                        <p className="mt-1.5 line-clamp-2 max-w-2xl break-words text-sm leading-relaxed text-paper/55">
+                        <p className="mt-1.5 line-clamp-2 max-w-2xl break-words text-sm leading-relaxed text-paper/65">
                           {item.description}
                         </p>
                       ) : null}
                       {item.comment?.trim() ? (
-                        <p className="mt-1.5 line-clamp-2 max-w-2xl break-words text-xs leading-relaxed text-paper/45">
+                        <p className="mt-1.5 line-clamp-2 max-w-2xl break-words text-xs leading-relaxed text-paper/60">
                           💬 {item.comment}
                         </p>
                       ) : null}

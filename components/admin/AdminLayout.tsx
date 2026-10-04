@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import type { MouseEvent, ReactNode } from 'react';
+import { SkipLink } from '@/components/SkipLink';
 
 type AdminLayoutProps = {
   children: ReactNode;
@@ -22,6 +23,7 @@ export function AdminLayout({ children, guardLeave }: AdminLayoutProps) {
 
   return (
     <div className="min-h-screen bg-ink">
+      <SkipLink label="Skip to the dashboard" />
       <header className="border-b border-paper/10">
         <div className="mx-auto flex h-14 max-w-content items-center gap-3 px-4 sm:h-16 sm:px-6">
           <Link

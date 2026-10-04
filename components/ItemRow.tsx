@@ -1,4 +1,5 @@
 import { Star } from 'lucide-react';
+import { CommentButton } from '@/components/CommentButton';
 import { DescriptionText } from '@/components/DescriptionText';
 import { LinkIcons } from '@/components/LinkIcons';
 import { buildSearchText } from '@/lib/filtering';
@@ -9,18 +10,21 @@ import type { ListItem } from '@/lib/types';
  * One row of the public list:
  *   line 1 → left:  name, "Added on <date>" (to the right of the name; the
  *            creation date, stamped automatically from the OS date when the
- *            resource is created), then the icon links when the matching URLs
- *            exist
+ *            resource is created), the category chip (when categorised),
+ *            then the icon links when the matching URLs exist
  *            right: "Tested on <date>" (when checked — the date is when the
- *                   admin checked the "Tested" checkbox), yellow stars (only
- *                   the rated ones — none when unrated), "Comment" link (when
- *                   a comment exists; hovering it pops the comment up)
- *   line 2 → description (muted, clamped to two lines; hovering it — or
- *            focusing it with the keyboard — pops the full text up)
+ *                   admin checked the "Tested" checkbox), stars on a 5-slot
+ *                   scale (only the rated ones — none when unrated),
+ *                   "Comment" button (when a comment exists; tapping it
+ *                   toggles the note popover)
+ *   line 2 → description (muted, clamped to two lines; tapping/hovering/
+ *            focusing it pops the full text up)
  *
  * Rendered on the server and kept as a static DOM subtree: the category,
- * "Tested" and search filters only toggle visibility, so the row DOM survives
- * filtering. The searchable text rides on `data-item-search`.
+ * "Tested" and search filters toggle visibility and the sort control
+ * re-orders rows, all through the DOM — so the row DOM survives every view
+ * change. The searchable text rides on `data-item-search`; `data-item-
+ * created` / `-name` / `-rating` drive the sorting.
  */
 
 function Stars({ rating }: { rating: number }) {
@@ -30,10 +34,14 @@ function Stars({ rating }: { rating: number }) {
       role="img"
       aria-label={`Rated ${rating} out of 5 stars`}
     >
-      {Array.from({ length: rating }, (_, index) => (
+      {Array.from({ length: 5 }, (_, index) => (
         <Star
           key={index}
-          className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400"
+          className={
+            index < rating
+              ? 'h-3.5 w-3.5 fill-yellow-400 text-yellow-400'
+              : 'h-3.5 w-3.5 text-paper/25'
+          }
           aria-hidden="true"
         />
       ))}
@@ -41,26 +49,13 @@ function Stars({ rating }: { rating: number }) {
   );
 }
 
-function CommentLink({ id, comment }: { id: string; comment: string }) {
-  return (
-    <span className="group relative inline-flex">
-      <a
-        href={`#item-${id}`}
-        className="text-xs font-medium text-paper/75 underline decoration-paper/25 underline-offset-2 transition-colors duration-150 hover:text-paper hover:decoration-paper/60"
-      >
-        Comment
-      </a>
-      <span
-        role="tooltip"
-        className="invisible absolute right-0 top-full z-20 mt-2 w-72 whitespace-pre-wrap break-words rounded-sm border border-paper/20 bg-[#1a1a1a] p-3 text-left text-xs leading-relaxed text-paper/80 opacity-0 shadow-[0_12px_40px_rgba(0,0,0,0.55)] transition-opacity duration-150 group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100"
-      >
-        {comment}
-      </span>
-    </span>
-  );
-}
+type ItemRowProps = {
+  item: ListItem;
+  /** Display name of the item's category; omitted when unclassified. */
+  categoryName?: string;
+};
 
-export function ItemRow({ item }: { item: ListItem }) {
+export function ItemRow({ item, categoryName }: ItemRowProps) {
   const name = item.name?.trim();
   const rating = Math.min(5, Math.max(0, Math.round(item.rating ?? 0)));
   const comment = item.comment?.trim();
@@ -75,6 +70,9 @@ export function ItemRow({ item }: { item: ListItem }) {
       data-item-category={item.categoryId ?? ''}
       data-item-tested={item.tested ? 'true' : 'false'}
       data-item-search={buildSearchText(item)}
+      data-item-created={item.createdAt}
+      data-item-name={(name ?? '').toLocaleLowerCase()}
+      data-item-rating={rating}
       className="border-b border-paper/10 transition-colors duration-150 hover:bg-paper/[0.03]"
     >
       <div className="px-1 py-5 sm:px-3">
@@ -84,12 +82,17 @@ export function ItemRow({ item }: { item: ListItem }) {
               {name ? (
                 name
               ) : (
-                <span className="font-normal italic text-paper/40">Unnamed resource</span>
+                <span className="font-normal italic text-paper/55">Unnamed resource</span>
               )}
             </h2>
             {addedAt ? (
-              <span className="whitespace-nowrap text-xs tracking-wide text-paper/45">
+              <span className="whitespace-nowrap text-xs tracking-wide text-paper/65">
                 {`Added on ${addedAt}`}
+              </span>
+            ) : null}
+            {categoryName ? (
+              <span className="shrink-0 rounded-sm border border-paper/20 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-[0.12em] text-paper/65">
+                {categoryName}
               </span>
             ) : null}
             <LinkIcons item={item} />
@@ -101,7 +104,7 @@ export function ItemRow({ item }: { item: ListItem }) {
               </span>
             ) : null}
             {rating > 0 ? <Stars rating={rating} /> : null}
-            {comment ? <CommentLink id={item.id} comment={comment} /> : null}
+            {comment ? <CommentButton id={item.id} comment={comment} /> : null}
           </div>
         </div>
         {description ? <DescriptionText id={item.id} description={description} /> : null}

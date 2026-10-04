@@ -5,7 +5,13 @@ import { Directory } from '@/components/Directory';
 import { ItemRow } from '@/components/ItemRow';
 import type { CategoryWithCount, ListItem } from '@/lib/types';
 
-afterEach(cleanup);
+// The Directory mirrors filters + sort into the URL query string; jsdom keeps
+// the location across tests in one file, so reset it after each test to keep
+// the URL-restore behaviour from bleeding into the next render.
+afterEach(() => {
+  cleanup();
+  window.history.replaceState(null, '', window.location.pathname);
+});
 
 const categories: CategoryWithCount[] = [
   { id: 'tools', name: 'Tools', createdAt: '2026-01-01T00:00:00.000Z', itemCount: 2 },
@@ -257,5 +263,93 @@ describe('ItemRow — two-line descriptions', () => {
     expect(within(rowByName('Short')).getByRole('tooltip').textContent).toBe('Tiny.');
     // No description → no tooltip for that row.
     expect(rowByName('Empty').querySelector('[role="tooltip"]')).toBeNull();
+  });
+});
+
+describe('Directory — comment popover (tap-friendly)', () => {
+  it('toggles the comment popover with the button and hides it again', () => {
+    render(
+      <Directory categories={categories}>
+        <ItemRow item={item({ id: 'cmt', name: 'Trivy', comment: 'Great tool.' })} />
+      </Directory>,
+    );
+    const button = screen.getByRole('button', { name: 'Comment' });
+    const popover = within(rowByName('Trivy')).getByRole('tooltip');
+    expect(popover.classList.contains('invisible')).toBe(true);
+    expect(button.getAttribute('aria-expanded')).toBe('false');
+
+    fireEvent.click(button);
+    expect(popover.classList.contains('visible')).toBe(true);
+    expect(button.getAttribute('aria-expanded')).toBe('true');
+
+    fireEvent.click(button);
+    expect(popover.classList.contains('invisible')).toBe(true);
+  });
+});
+
+describe('Directory — URL round-trip', () => {
+  it('restores filters + search from the query string on first render', () => {
+    window.history.replaceState(null, '', '/?category=security&tested=0&q=docker');
+    renderDirectory();
+
+    expect(visibleNames()).toEqual(['Docker bench']);
+    expect((screen.getByLabelText('Search') as HTMLInputElement).value).toBe('docker');
+    expect((screen.getByLabelText('Filter by category') as HTMLSelectElement).value).toBe(
+      'security',
+    );
+    expect((screen.getByLabelText('Tested') as HTMLInputElement).checked).toBe(false);
+    expect((screen.getByLabelText('Non-tested') as HTMLInputElement).checked).toBe(true);
+  });
+
+  it('mirrors non-default filters into the URL and clears it via Reset', () => {
+    renderDirectory();
+    fireEvent.change(screen.getByLabelText('Search'), { target: { value: 'bench' } });
+    expect(window.location.search).toBe('?q=bench');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reset filters' }));
+    expect(window.location.search).toBe('');
+    expect(visibleNames().length).toBe(4);
+  });
+});
+
+describe('Directory — sorting', () => {
+  it('re-orders the rows by name (A–Z)', () => {
+    renderDirectory();
+    fireEvent.change(screen.getByLabelText('Sort resources'), { target: { value: 'name' } });
+    expect(visibleNames()).toEqual(['Docker bench', 'Notepad', 'Ollama', 'Trivy']);
+  });
+
+  it('re-orders the rows by rating (best first)', () => {
+    render(
+      <Directory categories={categories}>
+        <ItemRow item={item({ id: 'a', name: 'Two stars', rating: 2 })} />
+        <ItemRow item={item({ id: 'b', name: 'Five stars', rating: 5 })} />
+        <ItemRow item={item({ id: 'c', name: 'One star', rating: 1 })} />
+      </Directory>,
+    );
+    expect(visibleNames()).toEqual(['Two stars', 'Five stars', 'One star']); // default: newest
+    fireEvent.change(screen.getByLabelText('Sort resources'), { target: { value: 'rating' } });
+    expect(visibleNames()).toEqual(['Five stars', 'Two stars', 'One star']);
+  });
+});
+
+describe('Directory — result count and keyboard shortcut', () => {
+  it('shows the visible count while filtering', () => {
+    renderDirectory();
+    expect(screen.getByText('4 resources')).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('Search'), { target: { value: 'lin' } });
+    expect(screen.getByText('3 of 4 resources')).toBeTruthy();
+  });
+
+  it('focuses the search box on "/" and clears it on Escape', () => {
+    renderDirectory();
+    const search = screen.getByLabelText('Search') as HTMLInputElement;
+
+    fireEvent.change(search, { target: { value: 'ollama' } });
+    fireEvent.keyDown(window, { key: '/' });
+    expect(document.activeElement).toBe(search);
+
+    fireEvent.keyDown(search, { key: 'Escape' });
+    expect(search.value).toBe('');
   });
 });

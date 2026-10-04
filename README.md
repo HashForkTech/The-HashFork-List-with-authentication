@@ -6,9 +6,7 @@ A self-hosted directory of curated resources: GitHub projects, LLMs, models and 
 
 **This build has no admin login.** No accounts, no passwords, no cookies, so it also needs no SSL/TLS certificate to run.
 
-![Public list](https://github.com/user-attachments/assets/366aa137-2c7e-4731-9933-77d64ef98f4e)
-![Admin dashboard](https://github.com/user-attachments/assets/66fdde40-cc2c-4182-970b-59512162ce14)
-![Resource editor](https://github.com/user-attachments/assets/ac277ed5-a2f0-46a8-81c3-6f5716ca1a48)
+![The public list: a filter bar with a category menu, Tested and Non-tested checkboxes, a search field and a sort menu, above resource rows that each show a name, an added date, a category chip, link icons, a tested date, a five slot star rating, a Comment button and a two line description](docs/screenshots/public-list.png)
 
 ---
 
@@ -16,11 +14,13 @@ A self-hosted directory of curated resources: GitHub projects, LLMs, models and 
 
 **Public list** (`/`)
 
-- Resources grouped by category, each with a name, description, links and review metadata.
+- Resources grouped by category, each with a name, description, links, a category chip and review metadata.
 - Links are shown as icons: GitHub, website, Hugging Face, YouTube.
-- A "Tested" badge with the date it was checked, a star rating from 0 to 5, and an optional comment on hover.
-- Filter bar: category, Tested / Non-tested, and a case-insensitive search over name, description and comment. All three combine.
-- Descriptions are clamped to two lines, with the full text on hover or keyboard focus.
+- A "Tested" badge with the date it was checked, a star rating from 0 to 5 (drawn on a 5-slot scale), and an optional comment behind a "Comment" button (tap- and keyboard-friendly).
+- Filter bar: category, Tested / Non-tested, and a case-insensitive search over name, description and comment. All three combine, and a sort control orders the list by newest, name or rating.
+- A live result count ("12 of 31 resources") sits under the filter bar with a "Reset filters" shortcut. Filters and sort are mirrored into the URL query string (`/?category=…&tested=0&q=…&sort=rating`), so a view can be bookmarked, shared, and restored after a refresh.
+- Press `/` anywhere to jump to the search field; `Esc` clears it.
+- Descriptions are clamped to two lines; clicking/tapping, hovering or keyboard-focus reveals the full text in a popover.
 
 **Admin area** (`/admin`)
 
@@ -33,24 +33,55 @@ A self-hosted directory of curated resources: GitHub projects, LLMs, models and 
 
 - No authentication of any kind. Anyone who can reach `/admin` can edit content; see [Security model](#what-the-app-does-and-does-not-protect).
 - No external database or SaaS backend. Everything is one local SQLite file.
-- No third-party scripts, fonts or analytics; the Content-Security-Policy allow-lists nothing outside the app itself.
+- No third-party scripts, fonts or analytics; the Content-Security-Policy allow-lists nothing outside the app itself. The Inter typeface is self-hosted (bundled from `@fontsource-variable/inter` at build time, served from the same origin).
 
 ---
 
 ## Table of contents
 
 1. [Quick start](#quick-start)
-2. [Scripts](#scripts)
-3. [Environment variables](#environment-variables)
-4. [How the data is stored](#how-the-data-is-stored)
-5. [Using the admin area](#using-the-admin-area)
-6. [Backup and restore](#backup-and-restore)
-7. [Schema migrations](#schema-migrations)
-8. [Security model](#security-model)
-9. [Deployment](#deployment)
-10. [Project structure](#project-structure)
-11. [Testing](#testing)
-12. [Troubleshooting](#troubleshooting)
+2. [Screenshots](#screenshots)
+3. [Scripts](#scripts)
+4. [Environment variables](#environment-variables)
+5. [How the data is stored](#how-the-data-is-stored)
+6. [Using the admin area](#using-the-admin-area)
+7. [Backup and restore](#backup-and-restore)
+8. [Schema migrations](#schema-migrations)
+9. [Security model](#security-model)
+10. [Deployment](#deployment)
+11. [Project structure](#project-structure)
+12. [Testing](#testing)
+13. [Troubleshooting](#troubleshooting)
+
+---
+
+## Screenshots
+
+Every image below comes from a production build (`npm run build` then `npm run start`) running against a demo database with 17 resources in 5 categories. The image at the top of this file is the default public view.
+
+### Public list
+
+Filters and sort mirrored into the URL (`/?category=inference-engines&sort=rating`), with the live result count, the "Reset filters" shortcut, and an open comment popover.
+
+![The public list filtered to the Inference Engines category and sorted by best rated, showing "4 of 17 resources", a "Reset filters" link, category chips, star ratings, and an open comment popover under the first row](docs/screenshots/public-list-filters.png)
+
+The same list on a phone-sized viewport (390 px wide): the filter bar wraps to two rows and every resource stacks its metadata under the title.
+
+![The public list on a 390 pixel wide viewport, with a two row filter bar above stacked resource rows](docs/screenshots/public-list-mobile.png)
+
+### Admin area
+
+The dashboard at `/admin`: the main page title and the category list with its per-category resource counts.
+
+![The admin dashboard: header with an ADMIN badge and a View site link, a page title field with a Save button, and a category list where every row shows the name, the number of resources, and Rename and Delete buttons](docs/screenshots/admin-dashboard.png)
+
+The Resources section, which carries the same filter bar as the public list.
+
+![The admin Resources section: filter bar with category menu, Tested and Non-tested checkboxes, search field and an Add a resource button, above resource cards with category chips, a Tested badge, star ratings, the comment text, and Edit and Delete buttons](docs/screenshots/admin-resources.png)
+
+The resource editor for a single entry: category, name, description, the four link fields, the star rating, the Tested checkbox with its stored check date, and the comment.
+
+![The admin resource editor filled in for Home Assistant: category set to Home Automation, name, description, website, GitHub and YouTube links, five filled stars, a checked Tested box showing "Last checked on 2026-10-03", a comment, and Save and Cancel buttons](docs/screenshots/admin-resource-editor.png)
 
 ---
 
@@ -281,6 +312,7 @@ lib/
   api/admin-client.ts           Typed fetch client used by the admin UI
 middleware.ts                   Security headers and CSP
 tests/                          Vitest suite (unit tests + jsdom UI tests)
+docs/screenshots/               Images used in this README
 data/                           SQLite database, created at runtime, git-ignored
 ```
 

@@ -163,7 +163,7 @@ export function DataTools({ onImported, onNotice }: DataToolsProps) {
                 Merge — adds the file’s items, skips those that already exist.
               </span>
             </label>
-            <label className="mt-2.5 flex items-start gap-2.5 text-sm text-paper/75">
+            <label className="mt-3 flex items-start gap-2.5 text-sm text-paper/75">
               <input
                 type="radio"
                 name="import-mode"
@@ -207,7 +207,7 @@ export function DataTools({ onImported, onNotice }: DataToolsProps) {
                   Every current category and resource will be <strong>permanently deleted</strong>,
                   then the file “{fileName}” will be imported.
                 </p>
-                <p className="mt-2 text-paper/50">
+                <p className="mt-2 text-paper/60">
                   This action cannot be undone. Remember to export your current data before
                   continuing.
                 </p>

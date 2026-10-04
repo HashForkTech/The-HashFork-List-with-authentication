@@ -103,3 +103,72 @@ export function filterResources<T extends FilterableResource>(
 ): T[] {
   return resources.filter((resource) => matchesResourceFilter(resource, filters));
 }
+
+/** True when every filter sits at its default value. */
+export function filtersAreDefault(filters: ResourceFilterState): boolean {
+  return (
+    filters.categoryId === DEFAULT_FILTERS.categoryId &&
+    filters.showTested === DEFAULT_FILTERS.showTested &&
+    filters.showUntested === DEFAULT_FILTERS.showUntested &&
+    filters.query.trim() === ''
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Sorting + URL (de)serialisation — used by the public directory so the
+   chosen view survives refreshes and can be shared as a deep link.
+   ────────────────────────────────────────────────────────────────────────── */
+
+export const SORT_OPTIONS = ['newest', 'name', 'rating'] as const;
+export type SortMode = (typeof SORT_OPTIONS)[number];
+
+export const DEFAULT_SORT: SortMode = 'newest';
+
+/** Guard for values coming back from the URL. */
+export function isSortMode(value: string | null): value is SortMode {
+  return value === 'newest' || value === 'name' || value === 'rating';
+}
+
+/**
+ * Reads filters + sort from a query string (`?category=…&tested=0&untested=0&
+ * q=…&sort=…`). Unknown or missing values fall back to the defaults, so a
+ * hand-typed or stale link can never produce a broken state.
+ */
+export function parseFilterParams(search: string): {
+  filters: ResourceFilterState;
+  sort: SortMode;
+} {
+  const params = new URLSearchParams(search);
+
+  const categoryId = params.get('category');
+  const sortParam = params.get('sort');
+
+  return {
+    filters: {
+      categoryId: categoryId && categoryId !== '' ? categoryId : DEFAULT_FILTERS.categoryId,
+      showTested: params.get('tested') !== '0',
+      showUntested: params.get('untested') !== '0',
+      query: params.get('q') ?? '',
+    },
+    sort: isSortMode(sortParam) ? sortParam : DEFAULT_SORT,
+  };
+}
+
+/**
+ * Serialises filters + sort back into a query string. Only non-default
+ * values are written; returns '' when everything is at its default (the URL
+ * then carries no query at all).
+ */
+export function buildFilterParams(filters: ResourceFilterState, sort: SortMode): string {
+  const params = new URLSearchParams();
+
+  if (filters.categoryId !== DEFAULT_FILTERS.categoryId) {
+    params.set('category', filters.categoryId);
+  }
+  if (!filters.showTested) params.set('tested', '0');
+  if (!filters.showUntested) params.set('untested', '0');
+  if (filters.query.trim() !== '') params.set('q', filters.query.trim());
+  if (sort !== DEFAULT_SORT) params.set('sort', sort);
+
+  return params.toString();
+}

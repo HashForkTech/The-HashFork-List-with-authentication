@@ -23,3 +23,7 @@ next-env.d.ts
 npm-debug.log*
 /coverage
 *.tsbuildinfo
+
+# agent session artifacts
+.dsh-artifacts/
+.dsh-vision-toolkit/

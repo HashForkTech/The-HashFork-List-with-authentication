@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
   ALL_CATEGORIES,
+  buildFilterParams,
   buildSearchText,
   DEFAULT_FILTERS,
+  DEFAULT_SORT,
   filterResources,
   matchesResourceFilter,
   normalizeQuery,
+  parseFilterParams,
   type ResourceFilterState,
 } from '@/lib/filtering';
 
@@ -167,5 +170,29 @@ describe('filterResources', () => {
   it('keeps the original order and objects', () => {
     const result = filterResources(items, filters());
     expect(result).toEqual(items);
+  });
+});
+
+describe('URL (de)serialisation', () => {
+  it('round-trips non-default filters and sort', () => {
+    const state: ResourceFilterState = {
+      categoryId: 'cat-1',
+      showTested: false,
+      showUntested: true,
+      query: 'llm',
+    };
+    const query = buildFilterParams(state, 'rating');
+    expect(query).toBe('category=cat-1&tested=0&q=llm&sort=rating');
+    const parsed = parseFilterParams(`?${query}`);
+    expect(parsed.filters).toEqual(state);
+    expect(parsed.sort).toBe('rating');
+  });
+
+  it('writes nothing for default state and reads defaults from garbage', () => {
+    expect(buildFilterParams(DEFAULT_FILTERS, DEFAULT_SORT)).toBe('');
+    const parsed = parseFilterParams('?category=&sort=nope&tested=1&q=');
+    expect(parsed.filters.categoryId).toBe(ALL_CATEGORIES);
+    expect(parsed.filters.showTested).toBe(true);
+    expect(parsed.sort).toBe('newest');
   });
 });

@@ -4,7 +4,9 @@ import type { Config } from 'tailwindcss';
  * The visual identity is intentionally restricted to two colors:
  *   - background: #141414 ("ink")
  *   - foreground: #dedede ("paper")
- * Every other tone is an opacity variation of those two values.
+ * Every other tone is an opacity variation of those two values — with one
+ * documented exception: the yellow-400 star rating, the single accent used
+ * to make the curated ratings pop against the monochrome list.
  */
 const config: Config = {
   content: ['./app/**/*.{ts,tsx}', './components/**/*.{ts,tsx}'],
@@ -16,6 +18,10 @@ const config: Config = {
       },
       fontFamily: {
         sans: [
+          // Self-hosted via @fontsource-variable/inter (bundled at build
+          // time, served from 'self' — keeps the strict CSP and offline
+          // installs happy).
+          '"Inter Variable"',
           'Inter',
           'ui-sans-serif',
           'system-ui',

@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
+import '@fontsource-variable/inter';
 import { getDb } from '@/lib/db/client';
 import { getSiteTitle } from '@/lib/db/repositories/settings';
 import './globals.css';
@@ -46,7 +47,7 @@ export async function generateMetadata(): Promise<Metadata> {
       url: appUrl,
     },
     twitter: {
-      card: 'summary',
+      card: 'summary_large_image',
       title: siteName,
       description: SITE_DESCRIPTION,
     },
