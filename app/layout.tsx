@@ -4,8 +4,11 @@ import { getDb } from '@/lib/db/client';
 import { getSiteTitle } from '@/lib/db/repositories/settings';
 import './globals.css';
 
+// One-liner for the page <meta>, Open Graph and Twitter card. Kept under 160
+// characters so search engines and link previews don't cut the end off. It
+// deliberately omits the site name: the title is admin-configurable.
 const SITE_DESCRIPTION =
-  'A curated list of GitHub applications, LLMs, models and AI tools.';
+  'A self-hosted, hand-curated directory of GitHub projects, LLMs, models and AI tools — each with a tested-on date, star rating and notes.';
 
 const appUrl = process.env.APP_URL?.trim() || 'http://localhost:3000';
 

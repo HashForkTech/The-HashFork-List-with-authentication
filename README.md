@@ -1,14 +1,39 @@
 # The HashFork List
 
-A minimalist, dark-themed directory of curated resources: GitHub applications, LLMs, models and AI tools,  with an English public interface and a simple admin area.
+A self-hosted directory of curated resources: GitHub projects, LLMs, models and AI tools. It comes with a clean public list and a simple admin screen, and it runs as one Node.js process on top of a single SQLite file.
 
-> **Stack** Next.js (App Router) · TypeScript · React · Tailwind CSS · SQLite (local file)
->
-> **This build has NO admin password and NO translation widget**. No accounts, no passwords, no cookies, therefore **no SSL/TLS certificate is required** to run it.
+**Stack:** Next.js (App Router) · TypeScript · React · Tailwind CSS · SQLite
 
-<img width="721" height="342" alt="image" src="https://github.com/user-attachments/assets/366aa137-2c7e-4731-9933-77d64ef98f4e" /> 
-<img width="714" height="330" alt="image" src="https://github.com/user-attachments/assets/66fdde40-cc2c-4182-970b-59512162ce14" />
-<img width="722" height="1059" alt="image" src="https://github.com/user-attachments/assets/ac277ed5-a2f0-46a8-81c3-6f5716ca1a48" />
+**This build has no admin login.** No accounts, no passwords, no cookies, so it also needs no SSL/TLS certificate to run.
+
+![Public list](https://github.com/user-attachments/assets/366aa137-2c7e-4731-9933-77d64ef98f4e)
+![Admin dashboard](https://github.com/user-attachments/assets/66fdde40-cc2c-4182-970b-59512162ce14)
+![Resource editor](https://github.com/user-attachments/assets/ac277ed5-a2f0-46a8-81c3-6f5716ca1a48)
+
+---
+
+## What you get
+
+**Public list** (`/`)
+
+- Resources grouped by category, each with a name, description, links and review metadata.
+- Links are shown as icons: GitHub, website, Hugging Face, YouTube.
+- A "Tested" badge with the date it was checked, a star rating from 0 to 5, and an optional comment on hover.
+- Filter bar: category, Tested / Non-tested, and a case-insensitive search over name, description and comment. All three combine.
+- Descriptions are clamped to two lines, with the full text on hover or keyboard focus.
+
+**Admin area** (`/admin`)
+
+- Edit the main page title, categories and resources; export and import the data.
+- Same filter bar as the public list.
+- Forms refuse to close with unsaved changes: you get **Save / Discard changes / Keep editing**.
+- Deleting a category keeps its resources (they simply become uncategorized).
+
+**What it deliberately leaves out**
+
+- No authentication of any kind. Anyone who can reach `/admin` can edit content; see [Security model](#what-the-app-does-and-does-not-protect).
+- No external database or SaaS backend. Everything is one local SQLite file.
+- No third-party scripts, fonts or analytics; the Content-Security-Policy allow-lists nothing outside the app itself.
 
 ---
 
@@ -17,11 +42,11 @@ A minimalist, dark-themed directory of curated resources: GitHub applications, L
 1. [Quick start](#quick-start)
 2. [Scripts](#scripts)
 3. [Environment variables](#environment-variables)
-4. [Data storage](#data-storage)
-5. [Admin area (no password)](#admin-area-no-password)
-6. [Backup & restore](#backup--restore)
-7. [Database migrations & initialization](#database-migrations/initialization)
-8. [Security notes](#security-notes)
+4. [How the data is stored](#how-the-data-is-stored)
+5. [Using the admin area](#using-the-admin-area)
+6. [Backup and restore](#backup-and-restore)
+7. [Schema migrations](#schema-migrations)
+8. [Security model](#security-model)
 9. [Deployment](#deployment)
 10. [Project structure](#project-structure)
 11. [Testing](#testing)
@@ -31,229 +56,264 @@ A minimalist, dark-themed directory of curated resources: GitHub applications, L
 
 ## Quick start
 
-Requirements: **Node.js ≥ 24** and npm.
+You need **Node.js 22 or newer**. Node 24 LTS is what the Docker image uses and what this README assumes.
 
 ```bash
-npm install          # installs Next.js, better-sqlite3, …
-cp .env.example .env # optional. Everything has sensible defaults
-npm run dev          # http://localhost:3000
+npm install
+cp .env.example .env   # optional, every value has a working default
+npm run dev            # http://localhost:3000
 ```
 
-Open <http://localhost:3000> for the public list and <http://localhost:3000/admin> to manage it (no login screen. The dashboard opens directly).
+Then open:
 
-Production build:
+- <http://localhost:3000> for the public list
+- <http://localhost:3000/admin> for the admin area, which opens straight into the dashboard with no login screen
+
+To build and serve the production bundle:
 
 ```bash
 npm run build
-npm run start        # serves the production build on PORT (default 3000)
+npm run start          # listens on PORT, default 3000
 ```
 
 ## Scripts
 
-| Command             | Purpose                                              |
-| ------------------- | ---------------------------------------------------- |
-| `npm run dev`       | Development server with hot reload                    |
-| `npm run build`     | Production build (also emits `.next/standalone`)      |
-| `npm run start`     | Serve the production build                            |
-| `npm run typecheck` | TypeScript check (`tsc --noEmit`)                     |
-| `npm test`          | Run the test suite (Vitest)                           |
-| `npm run test:watch`| Run tests in watch mode                               |
+| Command                | What it does                                       |
+| ---------------------- | -------------------------------------------------- |
+| `npm run dev`          | Dev server with hot reload                         |
+| `npm run build`        | Production build (also emits `.next/standalone`)   |
+| `npm run start`        | Serve the production build                         |
+| `npm run typecheck`    | Type check only (`tsc --noEmit`)                   |
+| `npm test`             | Run the test suite once (Vitest)                   |
+| `npm run test:watch`   | Run tests in watch mode                            |
 
 ## Environment variables
 
-All optional.There is **no secret to configure** (no passwords, no sessions). Copy `.env.example` to `.env` only to override defaults.
+Every variable is optional. There is no secret to configure, because there are no passwords and no sessions. Copy `.env.example` to `.env` only when you want to change a default.
 
-| Variable            | Default                 | Description                                                                 |
-| ------------------- | ----------------------- | --------------------------------------------------------------------------- |
-| `DATA_DIR`          | `./data`                | Directory holding the SQLite database. **Must be a persistent volume in production.** |
-| `DATABASE_FILE`     | `hashfork.sqlite`       | Database file name inside `DATA_DIR`.                                        |
-| `APP_URL`           | `http://localhost:3000` | Public origin (metadata base URL + host allow-list for write requests).     |
-| `TRUST_PROXY`       | `true`                  | Trust `X-Forwarded-For` / `X-Forwarded-Host` (set `false` when not behind a proxy). |
-| `ENABLE_HSTS`       | `false`                 | Send `Strict-Transport-Security`. Enable **only** when serving over HTTPS. |
+| Variable          | Default                 | Meaning                                                                        |
+| ----------------- | ----------------------- | ------------------------------------------------------------------------------ |
+| `DATA_DIR`        | `./data`                | Folder that holds the SQLite database. **Must be persistent storage in production.** |
+| `DATABASE_FILE`   | `hashfork.sqlite`       | Database file name inside `DATA_DIR`.                                          |
+| `APP_URL`         | `http://localhost:3000` | Public origin. Used for metadata and as the allowed host for write requests.   |
+| `TRUST_PROXY`     | `true`                  | Read client IP/host from `X-Forwarded-*`. Set `false` when not behind a proxy. |
+| `ENABLE_HSTS`     | `false`                 | Send `Strict-Transport-Security`. Turn on only when you serve over HTTPS.      |
 
-## Data storage
+## How the data is stored
 
-Everything lives in **one local SQLite database**. No external database service (no Supabase, Firebase, MongoDB Atlas, hosted SQL, Airtable, Notion …). Browser `localStorage` is never used as a database.
+One local SQLite database. No Supabase, Firebase, hosted Postgres, Airtable or Notion, and no `localStorage` pretending to be a database.
 
 ```
-data/                       ← DATA_DIR (back this up)
-  hashfork.sqlite           ← the database (WAL mode)
-  hashfork.sqlite-wal       ← write-ahead log (transient)
-  hashfork.sqlite-shm       ← shared-memory index (transient)
+data/                      <- DATA_DIR, this is what you back up
+  hashfork.sqlite          <- the database (WAL mode)
+  hashfork.sqlite-wal      <- write-ahead log (transient)
+  hashfork.sqlite-shm      <- shared-memory index (transient)
 ```
 
-Tables: `categories`, `items`, `settings` (key/value, e.g. the main page title). (Migration v2 also drops the auth tables of earlier builds.)
+Three tables: `categories`, `items`, and `settings` (key/value, currently the main page title). Earlier builds had `admin`, `sessions` and `rate_limits`; migration v2 drops them on upgrade.
 
-All reads/writes go through a repository layer (`lib/db/repositories/*`). React components and route handlers never touch SQLite directly, so migrating later to PostgreSQL or another database means re-implementing those repositories only.
+Nothing outside the repository layer touches SQLite: React components and route handlers go through `lib/db/repositories/*`. Swapping SQLite for PostgreSQL later means reimplementing those three files and nothing else.
 
-**Data survives server restarts** as long as `DATA_DIR` is on persistent storage.
+Your data survives restarts as long as `DATA_DIR` sits on persistent storage.
 
-## Admin area (no password)
+## Using the admin area
 
-`/admin` is the full content-management screen (main page title, categories, resources, backup tools). It opens **without any login**. There is no password, no account and no session cookie. That is exactly why **no SSL certificate is required**: the app never stores or transmits credentials.
+`/admin` is the whole content-management screen: main page title, categories, resources, and the backup tools. It opens without any login, because there is no password, no account and no session cookie. That is the reason no TLS certificate is required: the app never stores or transmits a credential.
 
-The **Resources** section carries the same filter bar as the public list (category, Tested / Non-tested and substring search — all combined). Editing is protected against accidental loss: closing or switching away from a category/resource form that holds unsaved changes opens a dialog offering **Save**, **Discard changes** or **Keep editing** (changes are compared with the saved values, so edits that were typed and then reverted never warn). A native browser prompt guards closing the tab or reloading.
+Two behaviours worth knowing:
 
-> ⚠️ **Know what this means.** Anyone who can reach `/admin` (and the `/api/*` write endpoints) can change your content. That is fine on a private machine, a LAN tool or behind a protective reverse proxy. It is **not** fine on an unauthenticated public URL. If the instance is exposed to people you don't trust, gate it at the server layer before it reaches Node:
+- **Filtering.** The Resources section carries the same filter bar as the public list: category, Tested / Non-tested, and substring search, all combinable.
+- **Nothing is lost by accident.** Closing a category or resource form, switching to another resource, or navigating away while the form differs from what is saved opens a dialog: **Save**, **Discard changes** or **Keep editing**. The comparison is against the saved values, so typing something and then reverting it never warns you. A native browser prompt guards a tab close or reload.
+
+> ⚠️ **Understand the trade-off.** Anyone who can reach `/admin` or the `/api/*` write endpoints can change your content. That is perfectly fine on your own machine, on a LAN, or behind a proxy that requires credentials. It is **not** fine on a public URL you share with strangers. If untrusted people can reach the instance, gate it before the request reaches Node:
 >
-> - **nginx / Caddy basic auth** on `/admin` and `/api` (the public list at `/` stays open);
-> - an **IP allow-list** or VPN-only binding (`127.0.0.1:3000` behind the proxy);
-> - a network-level gate (Tailscale, Cloudflare Access, firewall rule).
->
-> Example (nginx):
-> ```nginx
-> location ~ ^/(admin|api) {
->     auth_basic "Administration";
->     auth_basic_user_file /etc/nginx/.htpasswd;
->     proxy_pass http://127.0.0.1:3000;
-> }
-> location / {
->     proxy_pass http://127.0.0.1:3000;
-> }
-> ```
+> - basic auth from nginx / Caddy on `/admin` and `/api` (the public list at `/` stays open),
+> - an IP allow-list, or binding to `127.0.0.1:3000` so only the proxy can reach it,
+> - a network-level gate such as Tailscale, Cloudflare Access, or a firewall rule.
 
-The app itself still protects its write endpoints against **cross-origin "drive-by" requests** (a malicious web page running in a visitor's browser): mutations must carry a custom `x-requested-with: hashfork-admin` header and pass an `Origin` host check (see `lib/http/csrf.ts`).
+```nginx
+# nginx: keep the list public, gate the admin area
+location ~ ^/(admin|api) {
+    auth_basic "Administration";
+    auth_basic_user_file /etc/nginx/.htpasswd;
+    proxy_pass http://127.0.0.1:3000;
+}
+location / {
+    proxy_pass http://127.0.0.1:3000;
+}
+```
 
-## Backup & restore
+Whatever you choose, the app itself still rejects cross-origin "drive-by" writes, so a malicious website cannot mutate your data through a visitor's browser. See [Security model](#what-the-app-does-and-does-not-protect).
 
-Because the data is local, back it up deliberately.
+## Backup and restore
 
-### Option A. Export / Import (built in, recommended)
+Your data is a local file, so back it up on purpose.
+
+### Option A: Export / Import (built in, recommended)
 
 In **Admin → Data & backup**:
 
-- **Export data (JSON)** downloads `hashfork-list-backup-YYYY-MM-DD.json`:
+**Export data (JSON)** downloads `hashfork-list-backup-YYYY-MM-DD.json`:
 
-  ```json
-  {
-    "format": "the-hashfork-list/backup",
-    "version": 3,
-    "exportedAt": "…",
-    "categories": [ … ],
-    "items": [ … ]
-  }
-  ```
-
-- **Import** restores such a file (validated entirely before writing, applied in one transaction):
-  - *Merge*  adds missing entries, never overwrites existing ones (duplicates are skipped).
-  - *Replace all*  deletes current categories/items first and therefore **requires explicit confirmation** in a dialog *and* `confirm: true` in the request.
-
-### Option B. Copy the database file
-
-```bash
-# backup (consistent snapshot, even while running)
-sqlite3 data/hashfork.sqlite ".backup 'backup-$(date +%F).sqlite'"
-# or simply copy the file while the app is stopped
-cp data/hashfork.sqlite backup.sqlite
-
-# restore
-cp backup.sqlite data/hashfork.sqlite   # app stopped
+```json
+{
+  "format": "the-hashfork-list/backup",
+  "version": 3,
+  "exportedAt": "2026-01-01T12:00:00.000Z",
+  "categories": [],
+  "items": []
+}
 ```
 
-## Database migrations & initialization
+**Import** accepts such a file, in one of two modes. The whole file is validated before anything is written, and the import runs as a single transaction, so a bad file changes nothing.
 
-`lib/db/schema.ts` holds an ordered list of SQL migrations. On every connection, `migrate(db)` compares the SQLite `user_version` pragma with the migration list and runs each pending migration exactly once, inside a transaction. A brand-new database is created and migrated automatically on first request — there is no separate install step.
+- **Merge** adds what is missing and never overwrites; existing ids are skipped.
+- **Replace all** deletes the current categories and items first. It asks for explicit confirmation in a dialog *and* requires `confirm: true` in the request body.
 
-Adding a schema change = append a new `{ version: n, sql: … }` entry; existing databases upgrade on next start.
+### Option B: Copy the database file
 
-## Security notes
+```bash
+# Backup: a consistent snapshot, safe to run while the app is up
+sqlite3 data/hashfork.sqlite ".backup 'backup-$(date +%F).sqlite'"
 
-- **No credentials at all**. No password hashing, no sessions, no cookies, no `Secure`-cookie/HTTPS constraint. TLS is optional (still recommended on public networks for privacy).
-- **Cross-origin request protection** . Writes require a custom `x-requested-with: hashfork-admin` header (cross-site forms can't set it; cross-site `fetch` triggers a never-granted preflight), pass an `Origin` host allow-list check, and reject `Sec-Fetch-Site: cross-site`. This keeps third-party web pages from mutating your data through a visitor's browser.
-- **Input validation**. Zod schemas server-side (`lib/validation/schemas.ts`) for every payload; URLs must be `http(s)` (`javascript:`, `data:` … rejected), are length-capped and normalized (missing scheme → `https://`).
-- **XSS** — item names/descriptions are rendered as plain text by React (auto-escaped); never as raw HTML.
-- **Security headers** (`middleware.ts`). Strict self-contained `Content-Security-Policy` (no third-party origins at all), `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `Permissions-Policy`, `Cross-Origin-Opener-Policy`, `Cross-Origin-Resource-Policy`, optional HSTS. `upgrade-insecure-requests` is deliberately **not** set so plain-HTTP deployments keep working.
-- **Error handling**. User-facing English messages, no stack traces/SQL leaked; details are logged server-side.
-- **Rate limiting**. None is required (there is no login to brute-force). If you expose the write API publicly, do the rate limiting at the reverse proxy.
+# Or just copy the file while the app is stopped
+cp data/hashfork.sqlite backup.sqlite
+
+# Restore (with the app stopped)
+cp backup.sqlite data/hashfork.sqlite
+```
+
+## Schema migrations
+
+`lib/db/schema.ts` holds an ordered list of SQL migrations. On every connection `migrate(db)` compares the SQLite `user_version` pragma against that list and runs each pending migration exactly once, inside a transaction. A brand-new database is created and migrated on the first request, so there is no separate install step.
+
+To change the schema, append a new `{ version: n, sql: '...' }` entry. Existing databases catch up on the next start.
+
+## Security model
+
+### What the app does and does not protect
+
+| Threat                                                       | Covered? |
+| ---------------------------------------------------------------------------- | -------- |
+| Credentials stolen in transit (there are none)                               | n/a: there is no login, so there is no TLS requirement |
+| A third-party website mutating your data through a visitor's browser         | Yes: cross-origin mutation checks |
+| Injected HTML / `javascript:` URLs in resource fields                        | Yes: validation and React escaping |
+| Third-party script or framing attacks                                        | Yes: strict self-only CSP and `frame-ancestors 'none'` |
+| Someone on the same network or the public internet editing your content      | **No**: that is your reverse proxy's job |
+
+### How that is implemented
+
+- **No credentials anywhere.** No password hashing, no sessions and no cookies, so there is no `Secure`-cookie rule and no HTTPS requirement. TLS is still worth having on public networks for privacy.
+- **Cross-origin write protection** (`lib/http/csrf.ts`). A state-changing request must carry the custom header `x-requested-with: hashfork-admin` (a cross-site HTML form cannot set it, and a cross-site `fetch` would need a preflight that is never granted), pass a host check against the `Origin` header, and not be marked `Sec-Fetch-Site: cross-site`.
+- **Input validation.** Every payload goes through a Zod schema in `lib/validation/schemas.ts`. URLs must be `http(s)`, so `javascript:` and `data:` are rejected, and they are length-capped and normalized (a missing scheme becomes `https://`).
+- **No XSS sink.** Names and descriptions are rendered as plain text, auto-escaped by React; never injected as raw HTML.
+- **Security headers** (`middleware.ts`). A strict, self-only `Content-Security-Policy`, plus `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `Permissions-Policy`, `Cross-Origin-Opener-Policy` and `Cross-Origin-Resource-Policy`. HSTS is opt-in via `ENABLE_HSTS`. `upgrade-insecure-requests` is deliberately absent so plain-HTTP deployments keep working.
+- **Error handling.** Visitors see short English messages; stack traces and SQL details stay in the server log.
+- **Rate limiting.** None, and none is needed, because there is no login to brute-force. If you expose the write API, rate-limit it at the proxy.
 
 ## Deployment
 
-**The critical requirement: `DATA_DIR` must live on persistent storage.** The app is a single Node.js process plus a SQLite file. No TLS certificate is needed for the app to function.
+One requirement matters more than the rest: **`DATA_DIR` must live on persistent storage.** Beyond that, the app is a single Node process plus one SQLite file, and it needs no certificate.
 
 ```
-Browser → Next.js app (UI · API routes) → SQLite (categories · items)
+Browser -> Next.js app (UI + API routes) -> SQLite (categories, items, settings)
 ```
 
-### Node.js server / VPS (recommended)
+### Node.js server or VPS (recommended)
 
 ```bash
-npm ci --ignore-scripts   # no package build scripts are required (see Troubleshooting)
+npm ci --ignore-scripts    # no dependency build scripts are needed; see Troubleshooting
 npm run build
 DATA_DIR=/var/lib/hashfork APP_URL=http://your.host npm run start
 ```
 
-Run it under systemd / pm2 / Docker. A TLS-terminating proxy (Caddy, nginx) is optional; if you add one and want HSTS, set `ENABLE_HSTS=true`. To keep `/admin` private, add basic auth or an allow-list for `/admin` + `/api` in that proxy (see [Admin area (no password)](#admin-area-no-password)).
+Run it under systemd, pm2 or Docker. A TLS-terminating proxy (Caddy, nginx) is optional; add one and set `ENABLE_HSTS=true` if you want HSTS. To keep `/admin` private, put basic auth or an allow-list in front of `/admin` and `/api` in that proxy; see [Using the admin area](#using-the-admin-area).
 
-### Docker (persistent volume included)
+### Docker (persistent volume already wired up)
 
 ```bash
-docker compose up --build -d     # data lives in the named volume "hashfork-data"
+docker compose up --build -d    # data lives in the named volume "hashfork-data"
 ```
 
-See `Dockerfile` and `docker-compose.yml`. The volume is what makes the database durable, without it the data disappears with the container.
+See `Dockerfile` and `docker-compose.yml`. The volume is what makes the database durable; without it the data disappears with the container.
 
-The runtime image runs Next.js' **standalone server** (`node server.js` on `.next/standalone`, produced by `output: 'standalone'` in `next.config.mjs`) and copies `.next/static` + `public` into it, since the standalone bundle ships without assets. Do **not** change the container command to `npm run start`: `next start` does not work with a standalone build and will crash-loop the container.
+The runtime image starts Next.js' **standalone server** (`node server.js` inside `.next/standalone`, produced by `output: 'standalone'` in `next.config.mjs`) and copies `.next/static` and `public` into it, because the standalone bundle ships without assets. Do **not** change the container command to `npm run start`: `next start` cannot serve a standalone build and the container will crash-loop.
 
-### Platform warnings (read this)
+### Platform warnings
 
-| Platform | Persistent local disk? | What to do |
-| -------- | ---------------------- | ---------- |
-| VPS / dedicated server | Yes | Point `DATA_DIR` at a durable path. |
-| Fly.io | Volumes | Create a volume (`fly volumes create hashfork_data`) and mount it at the `DATA_DIR` path. |
-| Railway / Render | Volumes | Attach a persistent volume and set `DATA_DIR` to its mount path. |
-| AWS ECS / Fargate, Cloud Run | Only with mounted EFS/EBS | Attach persistent storage or the file system is ephemeral. |
-| **Vercel / Netlify (serverless)** | **No** | The file system is **ephemeral**: SQLite is not durable there. Use a persistent VM/container (or add a PostgreSQL repository implementation. The repository layer exists for exactly this). |
+Do not assume a local SQLite file survives a redeploy. Whether it does is a property of the platform, not of this app.
 
-Do **not** assume a local SQLite file is persistent on an ephemeral file system. If your platform has no persistent volume, the data will be lost on redeploy. That is a platform property, not something the app can fix.
+| Platform                       | Persistent local disk?       | What to do                                                                 |
+| ------------------------------ | ---------------------------- | -------------------------------------------------------------------------- |
+| VPS / dedicated server         | Yes                          | Point `DATA_DIR` at a durable path.                                        |
+| Fly.io                         | With a volume                | `fly volumes create hashfork_data`, mount it at the `DATA_DIR` path.        |
+| Railway / Render               | With a volume                | Attach a volume, set `DATA_DIR` to its mount path.                          |
+| AWS ECS / Fargate, Cloud Run   | Only with mounted EFS/EBS    | Attach persistent storage, otherwise the filesystem is ephemeral.           |
+| **Vercel / Netlify (serverless)** | **No**                    | The filesystem is ephemeral, so SQLite is not durable there. Use a persistent VM or container, or implement the PostgreSQL repositories. The repository layer exists for exactly this. |
 
 ## Project structure
 
 ```
 app/
-  page.tsx                 # public homepage (server-rendered)
-  layout.tsx, globals.css  # English metadata, dark theme
-  admin/page.tsx           # administration dashboard (no login)
-  admin/dashboard/page.tsx # redirect → /admin (kept for old links)
-  api/…                    # REST API (categories, items, export, import)
+  page.tsx                      Public list, server-rendered
+  layout.tsx, globals.css       English metadata, dark theme
+  error.tsx, not-found.tsx      Error and 404 boundaries
+  admin/page.tsx                Admin dashboard (no login)
+  admin/dashboard/page.tsx      Redirect to /admin, kept for old links
+  api/                          REST API: categories, items, settings, export, import
 components/
-  Header.tsx, Directory.tsx, ItemRow.tsx, LinkIcons.tsx
-  ResourceFilters.tsx      # shared filter bar (category / Tested / search)
-  DescriptionText.tsx      # two-line description + full-text hover tooltip
-  admin/                   # AdminDashboard, ItemForm, ConfirmDialog,
-                           # UnsavedChangesDialog, DataTools, AdminLayout
+  Header.tsx, Directory.tsx, ItemRow.tsx
+  ResourceFilters.tsx           Filter bar shared by public list and admin
+  DescriptionText.tsx           Two-line description + full-text tooltip
+  LinkIcons.tsx, BrandIcon.tsx  Per-link icons (GitHub, web, Hugging Face, YouTube)
+  admin/                        AdminDashboard, ItemForm, DataTools,
+                                ConfirmDialog, UnsavedChangesDialog, AdminLayout
 lib/
-  db/                      # SQLite client, schema migrations, error helpers
-  db/repositories/         # categories, items (data-access layer)
-  http/                    # api helpers, cross-origin mutation guard
-  validation/              # Zod schemas + URL normalization
-  filtering.ts             # shared category / status / substring-search filter
-  unsaved.ts               # unsaved-changes (form draft) comparison helpers
-  services/backup.ts       # export / import logic
-  api/admin-client.ts      # typed fetch client used by the admin UI
-middleware.ts              # security headers + CSP
-tests/                     # Vitest suite (unit + jsdom UI tests)
-data/                      # SQLite database (created at runtime, git-ignored)
+  types.ts                      Domain types shared by storage, API and UI
+  db/                           SQLite client, schema + migrations, error mapping
+  db/repositories/              categories, items, settings (the data-access layer)
+  http/                         api response helpers, cross-origin mutation check + guard
+  validation/                   Zod schemas, URL normalization
+  filtering.ts                  Category / Tested / substring-search filter logic
+  unsaved.ts                    Form-draft comparison for the unsaved-changes guard
+  format.ts, logger.ts          Date formatting, server-side logging
+  services/backup.ts            Export and import logic
+  api/admin-client.ts           Typed fetch client used by the admin UI
+middleware.ts                   Security headers and CSP
+tests/                          Vitest suite (unit tests + jsdom UI tests)
+data/                           SQLite database, created at runtime, git-ignored
 ```
 
 ## Testing
 
 ```bash
-npm test          # 130 tests across 10 files
+npm test        # 130 tests across 10 files
 ```
 
-Coverage includes: item CRUD with full/partial/empty payloads, URL validation & normalization, the “Tested” check date (stamped when the checkbox is checked, kept across edits, cleared when unchecked), category CRUD, **category deletion keeping its items**, category filtering, site settings (default + customized main page title, validation), cross-origin protection (missing header / cross-site origin / Sec-Fetch-Site / malformed Origin), "mutations need no credentials" and "auth endpoints + auth tables are gone", malformed & oversized input, and backup export/import (merge, replace-with-confirmation, malformed files).
+What the suite pins down:
 
-The newer behaviour is covered as well:
-
-- **Shared filtering** (`tests/filtering.test.ts`). Case-insensitive substring search over name/description/comment, category + Tested/Non-tested + search combinations, empty queries, resources without a category.
-- **Unsaved-changes detection** (`tests/unsaved.test.ts`). Draft normalization (trimmed text, normalized URLs, clamped rating), reverted edits staying clean, inline "new category" handling, category/title name comparison.
-- **Public list UI** (`tests/ui-directory.test.tsx`, jsdom).Search field placement next to *Non-tested*, filter combinations with live typing, no-match state, two-line description clamping, full description on hover and keyboard focus, empty descriptions.
-- **Admin UI** (`tests/ui-admin.test.tsx`, jsdom). The same filter combinations on the dashboard, and the unsaved-changes guard: normal leave without edits, the Save / Discard changes / Keep editing dialog, saving before switching to another resource, reverted edits not warning, category rename protection, and the navigation guard.
-
+- **Data layer.** Item create / update with full, partial and empty payloads; URL validation and normalization; the Tested check date (stamped when the box is checked, kept across unrelated edits, cleared when unchecked); category create and update; deleting a category keeps its items; category filtering; site settings including the default and a customized page title.
+- **Security.** A mutation without the custom header, from a cross-site origin, or marked cross-site by `Sec-Fetch-Site` is refused; a malformed `Origin` is refused; mutations need no credentials; the old auth endpoints and auth tables are gone. Badly shaped and oversized input is rejected.
+- **Backup.** Export, merge import, replace import with and without confirmation, and malformed backup files.
+- **Shared filtering** (`tests/filtering.test.ts`). Case-insensitive substring search over name, description and comment; category + Tested/Non-tested + search combinations; empty queries; resources without a category.
+- **Unsaved-changes detection** (`tests/unsaved.test.ts`). Draft normalization (trimmed text, normalized URLs, clamped rating); a reverted edit stays clean; inline "new category" handling; name comparison for categories and titles.
+- **Public list UI** (`tests/ui-directory.test.tsx`, jsdom). Search field placement next to *Non-tested*, filter combinations while typing, the no-match state, two-line description clamping, full description on hover and keyboard focus, empty descriptions.
+- **Admin UI** (`tests/ui-admin.test.tsx`, jsdom). The same filter combinations on the dashboard, plus the unsaved-changes guard: leaving normally with no edits, the Save / Discard / Keep editing dialog, saving before switching resources, reverted edits not warning, category-rename protection, and the navigation guard.
 
 ## Troubleshooting
 
-- **I want the admin area protected**. Put basic auth / an IP allow-list / a VPN gate in front of `/admin` and `/api` at the reverse proxy (see [Admin area (no password)](#admin-area-no-password)). The app intentionally ships without a login.
-- **`better-sqlite3` fails to install**. It ships prebuilt native binaries in its `prebuilds/` directory (e.g. `prebuilds/linux-x64.node`), but npm may still invoke `node-gyp` on it (it contains a `binding.gyp`), which fails on machines without a C++ toolchain, without a writable `~/.cache`, or without access to Node headers. Safe remedy: `npm ci --ignore-scripts` — no dependency lifecycle script is actually required (then verify with `npm test` and `npm run build`). When scripts do run, npm ≥ 11.19 must be allowed to run them: the project declares the policy in `package.json#allowScripts`.
-- **`SQLITE_CANTOPEN`**. `DATA_DIR` is not writable; point it at a writable, persistent path.
-- **Lost data after a redeploy**. Your platform's file system is ephemeral; see [Deployment](#deployment).
+**I want the admin area protected.**
+Put basic auth, an IP allow-list or a VPN gate in front of `/admin` and `/api` at the reverse proxy; see [Using the admin area](#using-the-admin-area). The app intentionally ships without a login.
+
+**`better-sqlite3` fails to install.**
+It ships prebuilt native binaries in its `prebuilds/` directory (for example `prebuilds/linux-x64.node`), but npm may still try to run `node-gyp` because the package contains a `binding.gyp`. That fails without a C++ toolchain, a writable `~/.cache`, or access to the Node headers. The simple fix is `npm ci --ignore-scripts`, since no dependency lifecycle script is actually needed. Verify with `npm test` and `npm run build`. If you do want scripts to run, npm 11.19 or newer must be allowed to run them; the project declares that policy in `package.json#allowScripts`.
+
+**`SQLITE_CANTOPEN`.**
+`DATA_DIR` is not writable. Point it at a writable path that also survives restarts.
+
+**My data disappeared after a redeploy.**
+Your platform's filesystem is ephemeral; see [Platform warnings](#platform-warnings).
+
+## License
+
+MIT. See [LICENSE](LICENSE).
