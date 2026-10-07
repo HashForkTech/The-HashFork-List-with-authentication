@@ -2,6 +2,8 @@
 
 A directory of curated resources: GitHub projects, LLMs, models and AI tools. It comes with a clean public list and a protected admin screen. Run it with SQLite on your own Node.js server or Docker, or with Supabase Postgres on Vercel.
 
+**Looking for local deployment without authentication?** The same app is also available without authentication for local deployment: [The HashFork List — without authentication](https://the-list.hashfork.tech/).
+
 **Stack:** Next.js (App Router) · TypeScript · React · Tailwind CSS · SQLite / Supabase Postgres
 
 **Admin access requires a password created during first-login setup, with optional authenticator-app 2FA.** The app saves only a salted Argon2id password verifier and uses bearer sessions held in browser memory. It creates no cookies. Serve production admin access over HTTPS.
