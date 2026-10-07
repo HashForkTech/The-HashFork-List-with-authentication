@@ -9,7 +9,7 @@ next-env.d.ts
 # production
 /build
 
-# local data (SQLite database + generated session secret) — never commit
+# local SQLite data and authentication state — never commit
 /data
 
 # env files
@@ -27,3 +27,10 @@ npm-debug.log*
 # agent session artifacts
 .dsh-artifacts/
 .dsh-vision-toolkit/
+
+# local TLS testing certificates and private keys
+/certificates/
+*.key
+*.crt
+*.p12
+*.pfx

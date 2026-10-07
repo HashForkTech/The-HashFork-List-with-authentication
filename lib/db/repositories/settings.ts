@@ -1,38 +1,22 @@
-import type { DB } from '../client';
+import type { Store } from '../store';
 import { DEFAULT_SITE_TITLE, type SiteSettings } from '../../types';
-
-/**
- * Site settings stored as simple key/value rows. Missing keys fall back to the
- * shipped defaults, so no seeding step is required.
- */
 
 const SITE_TITLE_KEY = 'site_title';
 
-type SettingRow = {
-  key: string;
-  value: string;
-};
-
-function getValue(db: DB, key: string): string | null {
-  const row = db.prepare('SELECT key, value FROM settings WHERE key = ?').get(key) as
-    | SettingRow
-    | undefined;
-  return row ? row.value : null;
+export async function getSiteTitle(db: Store): Promise<string> {
+  const row = await db.get<{ value: string }>('SELECT value FROM settings WHERE key = ?', [SITE_TITLE_KEY]);
+  return row?.value ?? DEFAULT_SITE_TITLE;
 }
 
-export function getSiteTitle(db: DB): string {
-  return getValue(db, SITE_TITLE_KEY) ?? DEFAULT_SITE_TITLE;
+export async function getSettings(db: Store): Promise<SiteSettings> {
+  return { siteTitle: await getSiteTitle(db) };
 }
 
-export function getSettings(db: DB): SiteSettings {
-  return { siteTitle: getSiteTitle(db) };
-}
-
-export function setSiteTitle(db: DB, title: string): SiteSettings {
+export async function setSiteTitle(db: Store, title: string): Promise<SiteSettings> {
   const trimmed = title.trim();
-  db.prepare(
-    `INSERT INTO settings (key, value) VALUES (?, ?)
-       ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
-  ).run(SITE_TITLE_KEY, trimmed);
+  await db.run(
+    'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value',
+    [SITE_TITLE_KEY, trimmed],
+  );
   return { siteTitle: trimmed };
 }

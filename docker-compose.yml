@@ -1,20 +1,26 @@
 services:
   hashfork-list:
     build: .
-    container_name: the-hashfork-list
     restart: unless-stopped
+    init: true
+    # Bind locally. Publish through an HTTPS reverse proxy in production.
     ports:
-      - '3000:3000'
+      - '127.0.0.1:3000:3000'
     environment:
-      APP_URL: ${APP_URL:-http://localhost:3000}
+      APP_URL: ${APP_URL:-https://localhost:8443}
+      DATABASE_PROVIDER: sqlite
       DATA_DIR: /data
-      # No password / no session secret — the admin area has no login.
-      # Protect /admin and /api at the reverse proxy if this is exposed
-      # (see README → "Admin area (no password)").
-      # ENABLE_HSTS: 'true'   # only when serving over HTTPS
+      DATABASE_FILE: ${DATABASE_FILE:-hashfork.sqlite}
+      ADMIN_SETUP_TOKEN: ${ADMIN_SETUP_TOKEN:?Set ADMIN_SETUP_TOKEN in .env before starting}
+      AUTH_ENCRYPTION_KEY: ${AUTH_ENCRYPTION_KEY:?Set AUTH_ENCRYPTION_KEY in .env before starting}
+      AUTH_SESSION_MINUTES: ${AUTH_SESSION_MINUTES:-60}
+      TRUST_PROXY: ${TRUST_PROXY:-false}
+      ENABLE_HSTS: ${ENABLE_HSTS:-false}
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     volumes:
-      # The named volume is what makes the SQLite database durable.
-      # Without it, data disappears when the container is replaced.
       - hashfork-data:/data
 
 volumes:

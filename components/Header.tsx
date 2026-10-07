@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { getDb } from '@/lib/db/client';
+import { getStore } from '@/lib/db/store';
 import { getSiteTitle } from '@/lib/db/repositories/settings';
 import { SkipLink } from '@/components/SkipLink';
 
@@ -10,8 +10,8 @@ import { SkipLink } from '@/components/SkipLink';
  * The centered title is width-capped and truncated so a long admin-chosen
  * title can never overlap the Admin button on small screens.
  */
-export function Header() {
-  const title = getSiteTitle(getDb());
+export async function Header() {
+  const title = await getSiteTitle(getStore());
   return (
     <>
       <SkipLink label="Skip to the list" />

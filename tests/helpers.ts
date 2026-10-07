@@ -2,18 +2,34 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach } from 'vitest';
-import { closeDb } from '@/lib/db/client';
+import { digest, hashPassword, newToken } from '@/lib/auth/crypto';
+import { closeDb, getDb } from '@/lib/db/client';
 
+export const TEST_PASSWORD = 'a-long-test-password-only';
+let testToken = '';
+let encodedPassword: Promise<string> | undefined;
 export const BASE_URL = 'http://localhost:3000';
 
 /** Installs a fresh, isolated SQLite database before every test. */
-export function setupTestDatabase(): void {
-  beforeEach(() => {
+export function setupTestDatabase(authenticated = true): void {
+  beforeEach(async () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hashfork-test-'));
     process.env.DATA_DIR = dir;
     process.env.APP_URL = BASE_URL;
     process.env.TRUST_PROXY = 'true';
+    process.env.DATABASE_PROVIDER = 'sqlite';
+    process.env.AUTH_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString('base64');
+    process.env.ADMIN_SETUP_TOKEN = 'test-owner-setup-secret-with-more-than-32-characters';
+    process.env.AUTH_SESSION_MINUTES = '60';
     closeDb();
+    testToken = '';
+    if (authenticated) {
+      encodedPassword ??= hashPassword(TEST_PASSWORD);
+      const db = getDb();
+      db.prepare('INSERT INTO admin_auth (id, password_hash, created_at) VALUES (1, ?, ?)').run(await encodedPassword, Date.now());
+      testToken = newToken();
+      db.prepare('INSERT INTO auth_sessions (token_hash, kind, version, mfa, expires_at, created_at) VALUES (?, ?, 1, 0, ?, ?)').run(digest(testToken), 'session', Date.now() + 3600000, Date.now());
+    }
   });
 
   afterEach(() => {
@@ -31,6 +47,7 @@ export type RequestOptions = {
   rawBody?: string;
   headers?: Record<string, string>;
   omitMutationHeader?: boolean;
+  omitAuthorization?: boolean;
 };
 
 /** Builds a Request the way the admin UI would (same-origin, custom header). */
@@ -38,6 +55,7 @@ export function apiRequest(pathname: string, options: RequestOptions = {}): Requ
   const headers: Record<string, string> = {
     'content-type': 'application/json',
     origin: BASE_URL,
+    ...(!options.omitAuthorization && testToken ? { authorization: 'Bearer ' + testToken } : {}),
     ...(options.omitMutationHeader ? {} : { 'x-requested-with': 'hashfork-admin' }),
     ...(options.headers ?? {}),
   };

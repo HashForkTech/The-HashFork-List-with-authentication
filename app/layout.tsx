@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
 import '@fontsource-variable/inter';
-import { getDb } from '@/lib/db/client';
+import { getStore } from '@/lib/db/store';
 import { getSiteTitle } from '@/lib/db/repositories/settings';
 import './globals.css';
 
@@ -13,14 +13,13 @@ const SITE_DESCRIPTION =
 
 const appUrl = process.env.APP_URL?.trim() || 'http://localhost:3000';
 
-// Everything renders fresh from the local database (title changes show up at
-// once, including on the statically-generated 404 page).
+// Render every page dynamically for live metadata and per-request script nonces.
 export const dynamic = 'force-dynamic';
 
 // The title of the main page is customizable from the admin area (default
 // "The HashFork List") and feeds the browser tab title and social metadata.
 export async function generateMetadata(): Promise<Metadata> {
-  const siteName = getSiteTitle(getDb());
+  const siteName = await getSiteTitle(getStore());
   return {
     metadataBase: new URL(appUrl),
     title: {

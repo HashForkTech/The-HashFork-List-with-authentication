@@ -1,4 +1,4 @@
-import { getDb } from '@/lib/db/client';
+import { getStore } from '@/lib/db/store';
 import { getSettings, setSiteTitle } from '@/lib/db/repositories/settings';
 import { jsonError, jsonOk, readJsonBody } from '@/lib/http/api';
 import { rejectUntrustedMutation } from '@/lib/http/guard';
@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic';
 /** GET /api/settings — public read (the main page renders the title from it). */
 export async function GET(): Promise<Response> {
   try {
-    return jsonOk({ settings: getSettings(getDb()) });
+    return jsonOk({ settings: await getSettings(getStore()) });
   } catch (error) {
     logger.error('reading settings failed', { error: (error as Error).message });
     return jsonError(500, 'server_error', 'An internal error occurred. Please try again.');
@@ -19,12 +19,12 @@ export async function GET(): Promise<Response> {
 }
 
 /**
- * PATCH /api/settings (no login required) — updates site settings such as the
+ * PATCH /api/settings (admin authentication required) — updates site settings such as the
  * title of the main page. Values are validated and trimmed server-side.
  */
 export async function PATCH(req: Request): Promise<Response> {
   try {
-    const denied = rejectUntrustedMutation(req);
+    const denied = await rejectUntrustedMutation(req);
     if (denied) return denied;
 
     const body = await readJsonBody(req);
@@ -37,7 +37,7 @@ export async function PATCH(req: Request): Promise<Response> {
       });
     }
 
-    const settings = setSiteTitle(getDb(), parsed.data.siteTitle);
+    const settings = await setSiteTitle(getStore(), parsed.data.siteTitle);
     logger.info('settings updated', { siteTitle: settings.siteTitle });
     return jsonOk({ settings });
   } catch (error) {

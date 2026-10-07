@@ -1,6 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { DB } from '@/lib/db/client';
-import { isConstraintViolation } from '@/lib/db/errors';
+import type { Store } from '@/lib/db/store';
 import {
   insertCategoryRaw,
   listCategoriesRaw,
@@ -19,7 +18,7 @@ import { normalizeUrl, type BackupPayloadInput } from '@/lib/validation/schemas'
  * Backup / restore.
  *
  * - exportData() produces a self-contained JSON document
- * - importData() validates everything first, then runs in a single SQLite
+ * - importData() validates everything first, then runs in a single database
  *   transaction: it either applies completely or not at all
  *
  * Import never overwrites existing rows:
@@ -41,14 +40,17 @@ export type ParsedBackup = {
   items: ListItem[];
 };
 
-export function exportData(db: DB): BackupFile {
-  return {
-    format: BACKUP_FORMAT,
-    version: BACKUP_VERSION,
-    exportedAt: new Date().toISOString(),
-    categories: listCategoriesRaw(db),
-    items: listItems(db),
-  };
+export async function exportData(db: Store): Promise<BackupFile> {
+  return db.transaction(async (tx) => {
+    if (tx.dialect === 'postgres') await tx.run('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
+    return {
+      format: BACKUP_FORMAT,
+      version: BACKUP_VERSION,
+      exportedAt: new Date().toISOString(),
+      categories: await listCategoriesRaw(tx),
+      items: await listItems(tx),
+    };
+  });
 }
 
 function validIsoOrNow(value: string | null | undefined): string {
@@ -106,48 +108,35 @@ export function toParsedBackup(input: BackupPayloadInput): ParsedBackup {
   return { categories, items };
 }
 
-export function importData(db: DB, parsed: ParsedBackup, mode: ImportMode): ImportSummary {
-  const run = db.transaction((): ImportSummary => {
+export async function importData(db: Store, parsed: ParsedBackup, mode: ImportMode): Promise<ImportSummary> {
+  return db.transaction(async (tx) => {
+    // Import is an atomic library operation; ordinary writes wait until it finishes.
+    if (tx.dialect === 'postgres') {
+      await tx.run('LOCK TABLE categories, items IN SHARE ROW EXCLUSIVE MODE');
+    }
     const summary: ImportSummary = {
       mode,
       categories: { created: 0, skipped: 0 },
       items: { created: 0, skipped: 0, unclassified: 0 },
     };
-
     if (mode === 'replace') {
-      db.prepare('DELETE FROM items').run();
-      db.prepare('DELETE FROM categories').run();
+      await tx.run('DELETE FROM items');
+      await tx.run('DELETE FROM categories');
     }
-
     for (const category of parsed.categories) {
-      try {
-        if (insertCategoryRaw(db, category)) summary.categories.created += 1;
-        else summary.categories.skipped += 1;
-      } catch (error) {
-        if (isConstraintViolation(error)) summary.categories.skipped += 1;
-        else throw error;
-      }
+      if (await insertCategoryRaw(tx, category)) summary.categories.created += 1;
+      else summary.categories.skipped += 1;
     }
-
-    const knownCategoryIds = new Set(listCategoriesRaw(db).map((category) => category.id));
-
+    const knownCategoryIds = new Set((await listCategoriesRaw(tx)).map((category) => category.id));
     for (const item of parsed.items) {
       const resolved: ListItem = {
         ...item,
         categoryId: item.categoryId && knownCategoryIds.has(item.categoryId) ? item.categoryId : null,
       };
       if (item.categoryId && !resolved.categoryId) summary.items.unclassified += 1;
-      try {
-        if (insertItemRaw(db, resolved)) summary.items.created += 1;
-        else summary.items.skipped += 1;
-      } catch (error) {
-        if (isConstraintViolation(error)) summary.items.skipped += 1;
-        else throw error;
-      }
+      if (await insertItemRaw(tx, resolved)) summary.items.created += 1;
+      else summary.items.skipped += 1;
     }
-
     return summary;
   });
-
-  return run();
 }

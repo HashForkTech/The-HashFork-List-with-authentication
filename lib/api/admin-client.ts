@@ -5,13 +5,9 @@ import type {
   ListItem,
   SiteSettings,
 } from '@/lib/types';
+import { clearAdminSession, getAdminSession } from '@/lib/api/admin-session';
 
-/**
- * Thin client for the admin API. Always sends the custom mutation header
- * (cross-origin protection) and maps API errors to user-friendly English
- * messages. There is no login in this build.
- */
-
+/** Cookie-free API requests use only the bearer token held in module memory. */
 export type ApiFailure = {
   ok: false;
   status: number;
@@ -31,19 +27,23 @@ export type ImportSummaryLike = {
 type RequestOptions = {
   method?: 'GET' | 'POST' | 'PATCH' | 'DELETE';
   body?: unknown;
+  authenticated?: boolean;
+  response?: 'json' | 'blob';
 };
 
-async function request<T>(url: string, options: RequestOptions = {}): Promise<ApiResult<T>> {
-  const method = options.method ?? 'GET';
+export async function adminRequest<T>(url: string, options: RequestOptions = {}): Promise<ApiResult<T>> {
+  const token = options.authenticated === false ? undefined : getAdminSession()?.token;
   const headers: Record<string, string> = { 'x-requested-with': 'hashfork-admin' };
+  if (token) headers.authorization = `Bearer ${token}`;
   if (options.body !== undefined) headers['content-type'] = 'application/json';
 
   let res: Response;
   try {
     res = await fetch(url, {
-      method,
+      method: options.method ?? 'GET',
       headers,
-      credentials: 'same-origin',
+      credentials: 'omit',
+      cache: 'no-store',
       body: options.body === undefined ? undefined : JSON.stringify(options.body),
     });
   } catch {
@@ -55,6 +55,10 @@ async function request<T>(url: string, options: RequestOptions = {}): Promise<Ap
     };
   }
 
+  if (res.ok && options.response === 'blob') {
+    return { ok: true, data: await res.blob() as T };
+  }
+
   let payload: unknown = null;
   try {
     payload = await res.json();
@@ -63,6 +67,9 @@ async function request<T>(url: string, options: RequestOptions = {}): Promise<Ap
   }
 
   if (!res.ok) {
+    if (res.status === 401 && token && getAdminSession()?.token === token) {
+      clearAdminSession('Your session has ended. Sign in again to continue.');
+    }
     const error = (
       payload as {
         error?: { code?: string; message?: string; details?: { issues?: string[] } };
@@ -82,47 +89,46 @@ async function request<T>(url: string, options: RequestOptions = {}): Promise<Ap
 
 export const adminApi = {
   listCategories: () =>
-    request<{ categories: CategoryWithCount[] }>('/api/categories', { method: 'GET' }),
+    adminRequest<{ categories: CategoryWithCount[] }>('/api/categories'),
 
-  listItems: () => request<{ items: ListItem[] }>('/api/items', { method: 'GET' }),
+  listItems: () => adminRequest<{ items: ListItem[] }>('/api/items'),
 
-  getSettings: () => request<{ settings: SiteSettings }>('/api/settings', { method: 'GET' }),
+  getSettings: () => adminRequest<{ settings: SiteSettings }>('/api/settings'),
 
   updateSettings: (siteTitle: string) =>
-    request<{ settings: SiteSettings }>('/api/settings', {
-      method: 'PATCH',
-      body: { siteTitle },
+    adminRequest<{ settings: SiteSettings }>('/api/settings', {
+      method: 'PATCH', body: { siteTitle },
     }),
 
   createCategory: (name: string) =>
-    request<{ category: Category }>('/api/categories', { method: 'POST', body: { name } }),
+    adminRequest<{ category: Category }>('/api/categories', { method: 'POST', body: { name } }),
 
   updateCategory: (id: string, name: string) =>
-    request<{ category: Category }>(`/api/categories/${encodeURIComponent(id)}`, {
-      method: 'PATCH',
-      body: { name },
+    adminRequest<{ category: Category }>(`/api/categories/${encodeURIComponent(id)}`, {
+      method: 'PATCH', body: { name },
     }),
 
   deleteCategory: (id: string) =>
-    request<{ ok: true; detachedItems: number }>(`/api/categories/${encodeURIComponent(id)}`, {
+    adminRequest<{ ok: true; detachedItems: number }>(`/api/categories/${encodeURIComponent(id)}`, {
       method: 'DELETE',
     }),
 
   createItem: (payload: ItemPayload) =>
-    request<{ item: ListItem }>('/api/items', { method: 'POST', body: payload }),
+    adminRequest<{ item: ListItem }>('/api/items', { method: 'POST', body: payload }),
 
   updateItem: (id: string, payload: ItemPayload) =>
-    request<{ item: ListItem }>(`/api/items/${encodeURIComponent(id)}`, {
-      method: 'PATCH',
-      body: payload,
+    adminRequest<{ item: ListItem }>(`/api/items/${encodeURIComponent(id)}`, {
+      method: 'PATCH', body: payload,
     }),
 
   deleteItem: (id: string) =>
-    request<{ ok: true }>(`/api/items/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+    adminRequest<{ ok: true }>(`/api/items/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+
+  exportData: () => adminRequest<Blob>('/api/export', { response: 'blob' }),
 
   importData: (body: {
     mode: 'merge' | 'replace';
     confirm?: boolean;
     data: { categories: unknown[]; items: unknown[] };
-  }) => request<{ ok: true; summary: ImportSummaryLike }>('/api/import', { method: 'POST', body }),
+  }) => adminRequest<{ ok: true; summary: ImportSummaryLike }>('/api/import', { method: 'POST', body }),
 };

@@ -1,98 +1,73 @@
 import { randomUUID } from 'node:crypto';
-import type { DB } from '../client';
+import type { Store } from '../store';
 import type { Category, CategoryWithCount } from '../../types';
 
-type CategoryRow = {
-  id: string;
-  name: string;
-  created_at: string;
-  updated_at: string;
-};
-
-type CategoryWithCountRow = CategoryRow & { item_count: number };
+type CategoryRow = { id: string; name: string; created_at: string; updated_at: string };
+type CategoryWithCountRow = CategoryRow & { item_count: number | string };
 
 function mapCategory(row: CategoryRow): Category {
   return { id: row.id, name: row.name, createdAt: row.created_at };
 }
 
-function mapCategoryWithCount(row: CategoryWithCountRow): CategoryWithCount {
-  return { ...mapCategory(row), itemCount: row.item_count };
+export async function listCategories(db: Store): Promise<CategoryWithCount[]> {
+  const rows = await db.all<CategoryWithCountRow>(
+    `SELECT c.id, c.name, c.created_at, c.updated_at,
+            (SELECT COUNT(*) FROM items i WHERE i.category_id = c.id) AS item_count
+       FROM categories c`,
+  );
+  return rows
+    .map((row) => ({ ...mapCategory(row), itemCount: Number(row.item_count) }))
+    .sort((a, b) => a.name.localeCompare(b.name, 'en', { sensitivity: 'base' }) || a.id.localeCompare(b.id, 'en'));
 }
 
-export function listCategories(db: DB): CategoryWithCount[] {
-  const rows = db
-    .prepare(
-      `SELECT c.id, c.name, c.created_at, c.updated_at,
-              (SELECT COUNT(*) FROM items i WHERE i.category_id = c.id) AS item_count
-         FROM categories c
-        ORDER BY c.created_at ASC, c.name ASC`,
-    )
-    .all() as CategoryWithCountRow[];
-  return rows.map(mapCategoryWithCount);
+export async function listCategoriesRaw(db: Store): Promise<Category[]> {
+  return (await listCategories(db)).map(({ id, name, createdAt }) => ({ id, name, createdAt }));
 }
 
-export function listCategoriesRaw(db: DB): Category[] {
-  return listCategories(db).map(({ id, name, createdAt }) => ({ id, name, createdAt }));
+/** Duplicate IDs are skipped atomically, including inside Postgres transactions. */
+export async function insertCategoryRaw(db: Store, category: Category): Promise<boolean> {
+  return await db.run(
+    'INSERT INTO categories (id, name, created_at, updated_at) VALUES (?, ?, ?, ?) ON CONFLICT (id) DO NOTHING',
+    [category.id, category.name, category.createdAt, new Date().toISOString()],
+  ) === 1;
 }
 
-/** Inserts a category with explicit id/timestamps (used by backup restore). */
-export function insertCategoryRaw(db: DB, category: Category): boolean {
-  const updatedAt = new Date().toISOString();
-  const info = db
-    .prepare(
-      'INSERT INTO categories (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)',
-    )
-    .run(category.id, category.name, category.createdAt, updatedAt);
-  return info.changes === 1;
-}
-
-export function getCategory(db: DB, id: string): Category | null {
-  const row = db.prepare('SELECT * FROM categories WHERE id = ?').get(id) as CategoryRow | undefined;
+export async function getCategory(db: Store, id: string): Promise<Category | null> {
+  const row = await db.get<CategoryRow>('SELECT * FROM categories WHERE id = ?', [id]);
   return row ? mapCategory(row) : null;
 }
 
-export function createCategory(db: DB, name: string, id: string = randomUUID()): Category {
+export async function createCategory(db: Store, name: string, id: string = randomUUID()): Promise<Category> {
   const now = new Date().toISOString();
-  db.prepare('INSERT INTO categories (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)').run(
-    id,
-    name,
-    now,
-    now,
-  );
+  await db.run('INSERT INTO categories (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)', [id, name, now, now]);
   return { id, name, createdAt: now };
 }
 
-export function updateCategory(db: DB, id: string, name: string): Category | null {
-  const now = new Date().toISOString();
-  const info = db
-    .prepare('UPDATE categories SET name = ?, updated_at = ? WHERE id = ?')
-    .run(name, now, id);
-  if (info.changes === 0) return null;
-  return { id, name, createdAt: (getCategory(db, id) as Category).createdAt };
+export async function updateCategory(db: Store, id: string, name: string): Promise<Category | null> {
+  return db.transaction(async (tx) => {
+    const existing = await getCategory(tx, id);
+    if (!existing) return null;
+    const changed = await tx.run('UPDATE categories SET name = ?, updated_at = ? WHERE id = ?', [name, new Date().toISOString(), id]);
+    return changed === 0 ? null : { id, name, createdAt: existing.createdAt };
+  });
 }
 
-export function countItemsInCategory(db: DB, id: string): number {
-  const row = db.prepare('SELECT COUNT(*) AS n FROM items WHERE category_id = ?').get(id) as {
-    n: number;
-  };
-  return row.n;
+export async function countItemsInCategory(db: Store, id: string): Promise<number> {
+  const row = await db.get<{ n: number | string }>('SELECT COUNT(*) AS n FROM items WHERE category_id = ?', [id]);
+  return Number(row?.n ?? 0);
 }
 
-/**
- * Deletes a category while KEEPING its items: their category association is
- * cleared (never silently delete associated objects).
- *
- * Returns the number of items that were detached from the category.
- */
-export function deleteCategory(db: DB, id: string): { deleted: boolean; detachedItems: number } {
-  const run = db.transaction(() => {
-    const detached = countItemsInCategory(db, id);
-    db.prepare('UPDATE items SET category_id = NULL, updated_at = ? WHERE category_id = ?').run(
-      new Date().toISOString(),
-      id,
+/** Delete the category while keeping its resources, returning the detached count. */
+export async function deleteCategory(db: Store, id: string): Promise<{ deleted: boolean; detachedItems: number }> {
+  return db.transaction(async (tx) => {
+    // Lock the parent first so concurrent inserts cannot attach another item.
+    const category = await tx.get<CategoryRow>(
+      'SELECT * FROM categories WHERE id = ?' + (tx.dialect === 'postgres' ? ' FOR UPDATE' : ''),
+      [id],
     );
-    const deleted = db.prepare('DELETE FROM categories WHERE id = ?').run(id).changes === 1;
+    if (!category) return { deleted: false, detachedItems: 0 };
+    const detached = await tx.run('UPDATE items SET category_id = NULL, updated_at = ? WHERE category_id = ?', [new Date().toISOString(), id]);
+    const deleted = await tx.run('DELETE FROM categories WHERE id = ?', [id]) === 1;
     return { deleted, detachedItems: deleted ? detached : 0 };
   });
-  return run();
 }

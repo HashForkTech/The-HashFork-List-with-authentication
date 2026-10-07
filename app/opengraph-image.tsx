@@ -1,7 +1,7 @@
 import { ImageResponse } from 'next/og';
-import { getDb } from '@/lib/db/client';
+import { getStore } from '@/lib/db/store';
 import { getSiteTitle } from '@/lib/db/repositories/settings';
-import { listItems } from '@/lib/db/repositories/items';
+import { countItems } from '@/lib/db/repositories/items';
 
 export const runtime = 'nodejs';
 export const size = { width: 1200, height: 630 };
@@ -14,10 +14,9 @@ export const dynamic = 'force-dynamic';
  * monochrome). The title is the admin-configured site title and the count
  * mirrors the live library, so the card never goes stale.
  */
-export default function OpengraphImage() {
-  const db = getDb();
-  const title = getSiteTitle(db);
-  const itemCount = listItems(db).length;
+export default async function OpengraphImage() {
+  const db = getStore();
+  const [title, itemCount] = await Promise.all([getSiteTitle(db), countItems(db)]);
 
   return new ImageResponse(
     (

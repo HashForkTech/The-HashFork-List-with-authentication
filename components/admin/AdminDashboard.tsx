@@ -13,6 +13,7 @@ import { adminApi } from '@/lib/api/admin-client';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { ConfirmDialog, type ConfirmOptions } from '@/components/admin/ConfirmDialog';
 import { DataTools } from '@/components/admin/DataTools';
+import { SecuritySettings } from '@/components/admin/SecuritySettings';
 import { ItemForm, type ItemFormHandle } from '@/components/admin/ItemForm';
 import { UnsavedChangesDialog } from '@/components/admin/UnsavedChangesDialog';
 import { LinkIcons } from '@/components/LinkIcons';
@@ -32,6 +33,8 @@ type AdminDashboardProps = {
   initialCategories: CategoryWithCount[];
   initialItems: ListItem[];
   initialSiteTitle: string;
+  initialMfaEnabled?: boolean;
+  onLogout?: () => Promise<string | null>;
 };
 
 function StarRow({ rating }: { rating: number }) {
@@ -77,12 +80,16 @@ export function AdminDashboard({
   initialCategories,
   initialItems,
   initialSiteTitle,
+  initialMfaEnabled = false,
+  onLogout,
 }: AdminDashboardProps) {
   const [categories, setCategories] = useState<CategoryWithCount[]>(initialCategories);
   const [items, setItems] = useState<ListItem[]>(initialItems);
   const [notice, setNotice] = useState<Notice | null>(null);
   const [confirm, setConfirm] = useState<PendingConfirm | null>(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
+  const [logoutBusy, setLogoutBusy] = useState(false);
+  const [securityExitMessage, setSecurityExitMessage] = useState<string | null>(null);
 
   const [siteTitle, setSiteTitle] = useState(initialSiteTitle);
   const [savedTitle, setSavedTitle] = useState(initialSiteTitle);
@@ -175,12 +182,14 @@ export function AdminDashboard({
       attemptLeave('item', showItemForm && itemDirty, () => {
         attemptLeave('category', categoryDirty, () => {
           attemptLeave('category-create', categoryCreateDirty, () => {
-            attemptLeave('title', titleDirty, proceed);
+            attemptLeave('title', titleDirty, () => {
+              if (!securityExitMessage || window.confirm(securityExitMessage)) proceed();
+            });
           });
         });
       });
     },
-    [attemptLeave, showItemForm, itemDirty, categoryDirty, categoryCreateDirty, titleDirty],
+    [attemptLeave, showItemForm, itemDirty, categoryDirty, categoryCreateDirty, titleDirty, securityExitMessage],
   );
 
   // Browser-level leaving (tab close, reload, full-page link) can only use the
@@ -421,10 +430,18 @@ export function AdminDashboard({
     return filterResources(searchable, itemFilters);
   }, [items, itemFilters]);
 
+  async function handleLogout() {
+    if (!onLogout || logoutBusy) return;
+    setLogoutBusy(true);
+    const error = await onLogout();
+    setLogoutBusy(false);
+    if (error) setNotice({ kind: 'error', text: error });
+  }
+
   /* --------------------------------- render -------------------------------- */
 
   return (
-    <AdminLayout guardLeave={guardNavigation}>
+    <AdminLayout guardLeave={guardNavigation} onLogout={onLogout ? () => guardNavigation(() => void handleLogout()) : undefined} logoutBusy={logoutBusy}>
       <main id="main-content" className="mx-auto w-full max-w-content px-4 pb-24 sm:px-6">
         <div className="py-6">
           <p className="section-title">Administration</p>
@@ -432,8 +449,7 @@ export function AdminDashboard({
             Dashboard
           </h1>
           <p className="mt-1.5 text-xs text-paper/60">
-            Password-free area (no SSL certificate required). If this instance is exposed to
-            untrusted people, protect /admin and /api at the server level — see README.
+            Your authenticated session stays in this tab. Refreshing the page signs you out.
           </p>
         </div>
 
@@ -777,6 +793,7 @@ export function AdminDashboard({
         </section>
 
         <DataTools onImported={() => void refresh()} onNotice={setNotice} />
+        {onLogout ? <SecuritySettings initialMfaEnabled={initialMfaEnabled} onExitRiskChange={setSecurityExitMessage} /> : null}
       </main>
 
       {confirm ? (

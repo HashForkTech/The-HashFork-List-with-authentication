@@ -25,7 +25,27 @@ export function DataTools({ onImported, onNotice }: DataToolsProps) {
   const [mode, setMode] = useState<'merge' | 'replace'>('merge');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [exportBusy, setExportBusy] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+
+  async function downloadExport() {
+    if (exportBusy) return;
+    setExportBusy(true);
+    const result = await adminApi.exportData();
+    setExportBusy(false);
+    if (!result.ok) {
+      onNotice({ kind: 'error', text: result.message });
+      return;
+    }
+    const url = URL.createObjectURL(result.data);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `hashfork-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
 
   function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -33,6 +53,10 @@ export function DataTools({ onImported, onNotice }: DataToolsProps) {
     setFileData(null);
     setFileName('');
     if (!file) return;
+    if (file.size > 3_900_000) {
+      setError('This backup is too large. Choose a JSON file smaller than 3.9 MB.');
+      return;
+    }
 
     const reader = new FileReader();
     reader.onload = () => {
@@ -115,10 +139,10 @@ export function DataTools({ onImported, onNotice }: DataToolsProps) {
             Downloads every category and resource as a JSON file (keep it somewhere safe, and
             import it to restore).
           </p>
-          <a href="/api/export" download className="btn mt-4">
+          <button type="button" onClick={() => void downloadExport()} disabled={exportBusy} className="btn mt-4">
             <Download className="h-4 w-4" aria-hidden="true" />
-            Export data (JSON)
-          </a>
+            {exportBusy ? 'Exporting…' : 'Export data (JSON)'}
+          </button>
         </div>
 
         <div className="panel p-4 sm:p-5">

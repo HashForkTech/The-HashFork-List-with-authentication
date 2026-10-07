@@ -3,6 +3,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { POST as categoryPost } from '@/app/api/categories/route';
 import { GET as exportGet } from '@/app/api/export/route';
+import { DELETE as categoryDelete, PATCH as categoryPatch } from '@/app/api/categories/[id]/route';
 import { DELETE as itemDelete, PATCH as itemPatch } from '@/app/api/items/[id]/route';
 import { GET as itemsGet, POST as itemPost } from '@/app/api/items/route';
 import { POST as importPost } from '@/app/api/import/route';
@@ -16,33 +17,40 @@ import {
 
 setupTestDatabase();
 
-describe('no authentication (by design)', () => {
-  it('allows admin mutations without any credential', async () => {
-    const res = await itemPost(apiRequest('/api/items', { method: 'POST', body: { name: 'libre' } }));
-    expect(res.status).toBe(201);
+describe('admin authorization', () => {
+  it('rejects every administrative mutation and export without a credential', async () => {
+    const responses = await Promise.all([
+      itemPost(apiRequest('/api/items', { method: 'POST', body: { name: 'unauthorized' }, omitAuthorization: true })),
+      itemPatch(apiRequest('/api/items/x', { method: 'PATCH', body: { name: 'x' }, omitAuthorization: true }), routeContext('x')),
+      itemDelete(apiRequest('/api/items/x', { method: 'DELETE', omitAuthorization: true }), routeContext('x')),
+      categoryPost(apiRequest('/api/categories', { method: 'POST', body: { name: 'x' }, omitAuthorization: true })),
+      categoryPatch(apiRequest('/api/categories/x', { method: 'PATCH', body: { name: 'x' }, omitAuthorization: true }), routeContext('x')),
+      categoryDelete(apiRequest('/api/categories/x', { method: 'DELETE', omitAuthorization: true }), routeContext('x')),
+      settingsPatch(apiRequest('/api/settings', { method: 'PATCH', body: { siteTitle: 'Hijacked' }, omitAuthorization: true })),
+      importPost(apiRequest('/api/import', { method: 'POST', body: { mode: 'replace', confirm: true, data: { categories: [], items: [] } }, omitAuthorization: true })),
+      exportGet(apiRequest('/api/export', { omitAuthorization: true })),
+    ]);
+    for (const response of responses) {
+      expect(response.status).toBe(401);
+      expect(response.headers.get('set-cookie')).toBeNull();
+    }
+    const list = await readJson(await itemsGet(new Request('http://localhost:3000/api/items')));
+    expect(list.items).toEqual([]);
   });
 
-  it('serves the export endpoint without a login', async () => {
-    const res = await exportGet(apiRequest('/api/export'));
-    expect(res.status).toBe(200);
-  });
-
-  it('no longer ships auth endpoints or auth tables', async () => {
-    expect(fs.existsSync(path.join(process.cwd(), 'app', 'api', 'auth'))).toBe(false);
+  it('ships authentication endpoints and persistent protected auth tables', async () => {
+    expect(fs.existsSync(path.join(process.cwd(), 'app', 'api', 'auth'))).toBe(true);
     const { getDb } = await import('@/lib/db/client');
-    const tables = getDb()
-      .prepare("SELECT name FROM sqlite_master WHERE type = 'table'")
-      .all() as Array<{ name: string }>;
+    const tables = getDb().prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as Array<{ name: string }>;
     const names = tables.map((table) => table.name);
+    expect(names).toEqual(expect.arrayContaining(['items', 'categories', 'admin_auth', 'auth_sessions', 'auth_rate_limits']));
     expect(names).not.toContain('admin');
     expect(names).not.toContain('sessions');
     expect(names).not.toContain('rate_limits');
-    expect(names).toContain('items');
-    expect(names).toContain('categories');
   });
 });
 
-describe('cross-origin protections (data safety without credentials)', () => {
+describe('cross-origin protections for authenticated requests', () => {
   it('requires the custom mutation header', async () => {
     const res = await itemPost(
       apiRequest('/api/items', {
@@ -76,7 +84,7 @@ describe('cross-origin protections (data safety without credentials)', () => {
     expect(res.status).toBe(403);
   });
 
-  it('accepts same-host origins (scheme may differ behind a proxy)', async () => {
+  it('rejects same-host origins with a different scheme', async () => {
     const res = await itemPost(
       apiRequest('/api/items', {
         method: 'POST',
@@ -84,7 +92,15 @@ describe('cross-origin protections (data safety without credentials)', () => {
         headers: { origin: 'https://localhost:3000' },
       }),
     );
-    expect(res.status).toBe(201);
+    expect(res.status).toBe(403);
+  });
+
+  it('does not let forwarded-host spoofing add an allowed origin', async () => {
+    const res = await itemPost(apiRequest('/api/items', {
+      method: 'POST', body: { name: 'x' },
+      headers: { origin: 'https://evil.example', 'x-forwarded-host': 'evil.example', 'x-forwarded-proto': 'https' },
+    }));
+    expect(res.status).toBe(403);
   });
 
   it('rejects a malformed Origin header', async () => {

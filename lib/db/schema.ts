@@ -1,3 +1,4 @@
+import { AUTH_SCHEMA } from '../auth/schema';
 import type { DB } from './client';
 
 /**
@@ -106,6 +107,7 @@ export const MIGRATIONS: Migration[] = [
       );
     `,
   },
+  { version: 6, sql: AUTH_SCHEMA },
 ];
 
 export function migrate(db: DB): void {

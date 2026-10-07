@@ -87,7 +87,7 @@ const items: ListItem[] = [
   item({ id: 'plain', categoryId: 'tools', tested: false, name: 'Notepad' }),
 ];
 
-function renderDashboard() {
+function renderDashboard(onLogout?: () => Promise<string | null>) {
   api.listCategories.mockResolvedValue(ok({ categories }));
   api.listItems.mockResolvedValue(ok({ items }));
   api.createItem.mockResolvedValue(ok({ item: items[0] }));
@@ -102,6 +102,7 @@ function renderDashboard() {
       initialCategories={categories}
       initialItems={items}
       initialSiteTitle="The HashFork List"
+      onLogout={onLogout}
     />,
   );
 }
@@ -422,5 +423,23 @@ describe('Admin — leaving the page', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Keep editing' }));
     expect(screen.queryByRole('alertdialog')).toBeNull();
     expect(screen.queryByRole('form', { name: 'Edit resource' })).toBeTruthy();
+  });
+});
+
+
+describe('Admin — authenticated sign out', () => {
+  it('resolves unsaved changes before revoking the session', async () => {
+    const logout = vi.fn().mockResolvedValue(null);
+    renderDashboard(logout);
+    fireEvent.click(within(rowByName('Ollama')).getByRole('button', { name: 'Edit' }));
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Unsaved resource' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+    expect(logout).not.toHaveBeenCalled();
+    fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Keep editing' }));
+    expect(logout).not.toHaveBeenCalled();
+    expect((screen.getByLabelText('Name') as HTMLInputElement).value).toBe('Unsaved resource');
+    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+    fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Discard changes' }));
+    await waitFor(() => expect(logout).toHaveBeenCalledOnce());
   });
 });

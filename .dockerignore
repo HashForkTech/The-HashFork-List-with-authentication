@@ -1,10 +1,21 @@
-# Keep the build context clean: `COPY . .` must never drag in the host's
-# node_modules (it would overwrite the deps-stage install), a stale .next
-# build, or the real SQLite database (which must not be baked into images).
+# Never bake dependencies, build output, credentials or live data into images.
 node_modules
 .next
 .git
 data
 .env
+.env.*
+!.env.example
+certificates
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+*.sqlite
+*.sqlite-*
 *.log
+coverage
 tsconfig.tsbuildinfo
+.dsh-artifacts
+.dsh-vision-toolkit

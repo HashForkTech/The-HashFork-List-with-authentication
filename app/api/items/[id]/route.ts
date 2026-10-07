@@ -1,4 +1,4 @@
-import { getDb } from '@/lib/db/client';
+import { getStore } from '@/lib/db/store';
 import { getCategory } from '@/lib/db/repositories/categories';
 import { deleteItem, getItem, updateItem } from '@/lib/db/repositories/items';
 import { jsonError, jsonOk, readJsonBody } from '@/lib/http/api';
@@ -13,15 +13,15 @@ export const dynamic = 'force-dynamic';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
-/** PATCH /api/items/[id] — partial update (no login required). */
+/** PATCH /api/items/[id] — partial update (admin authentication required). */
 export async function PATCH(req: Request, context: RouteContext): Promise<Response> {
   try {
-    const denied = rejectUntrustedMutation(req);
+    const denied = await rejectUntrustedMutation(req);
     if (denied) return denied;
 
     const { id } = await context.params;
-    const db = getDb();
-    if (!getItem(db, id)) {
+    const db = getStore();
+    if (!(await getItem(db, id))) {
       return jsonError(404, 'not_found', 'This resource does not exist (or no longer exists).');
     }
 
@@ -36,7 +36,7 @@ export async function PATCH(req: Request, context: RouteContext): Promise<Respon
     }
 
     const categoryId = parsed.data.categoryId ?? null;
-    if (categoryId && !getCategory(db, categoryId)) {
+    if (categoryId && !(await getCategory(db, categoryId))) {
       return jsonError(422, 'validation', 'Unknown category.', {
         issues: ['The selected category does not exist (or no longer exists).'],
       });
@@ -58,7 +58,7 @@ export async function PATCH(req: Request, context: RouteContext): Promise<Respon
       comment: parsed.data.comment,
     });
 
-    const item = updateItem(db, id, payload);
+    const item = await updateItem(db, id, payload);
     logger.info('item updated', { itemId: id });
     return jsonOk({ item });
   } catch (error) {
@@ -67,14 +67,14 @@ export async function PATCH(req: Request, context: RouteContext): Promise<Respon
   }
 }
 
-/** DELETE /api/items/[id] (no login required), requires confirmation in the UI. */
+/** DELETE /api/items/[id] (admin authentication required), requires confirmation in the UI. */
 export async function DELETE(req: Request, context: RouteContext): Promise<Response> {
   try {
-    const denied = rejectUntrustedMutation(req);
+    const denied = await rejectUntrustedMutation(req);
     if (denied) return denied;
 
     const { id } = await context.params;
-    const deleted = deleteItem(getDb(), id);
+    const deleted = await deleteItem(getStore(), id);
     if (!deleted) {
       return jsonError(404, 'not_found', 'This resource does not exist (or no longer exists).');
     }

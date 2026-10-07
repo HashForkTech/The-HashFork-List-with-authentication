@@ -8,7 +8,7 @@ import { NextResponse, type NextRequest } from 'next/server';
  * removed), so no external origins are allow-listed.
  */
 
-function buildCsp(): string {
+function buildCsp(nonce: string): string {
   const directives: string[] = [
     `default-src 'self'`,
     `base-uri 'self'`,
@@ -16,7 +16,7 @@ function buildCsp(): string {
     `frame-ancestors 'none'`,
     `frame-src 'none'`,
     `form-action 'self'`,
-    `script-src 'self' 'unsafe-inline'`,
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`,
     `style-src 'self' 'unsafe-inline'`,
     `img-src 'self' data: blob:`,
     `font-src 'self' data:`,
@@ -34,7 +34,7 @@ function buildCsp(): string {
   return directives.join('; ');
 }
 
-const CSP = buildCsp();
+
 
 /**
  * True when the request is served over a "potentially trustworthy" origin.
@@ -46,12 +46,18 @@ function isSecureOrigin(request: NextRequest): boolean {
     .get('x-forwarded-proto')
     ?.split(',')[0]
     ?.trim();
-  if (forwarded) return forwarded === 'https';
+  if (process.env.NODE_ENV === 'production') return process.env.TRUST_PROXY === 'true' && forwarded === 'https';
+  if (process.env.TRUST_PROXY === 'true' && forwarded) return forwarded === 'https';
   return request.nextUrl.protocol === 'https:';
 }
 
 export function middleware(request: NextRequest) {
-  const response = NextResponse.next();
+  const nonce = btoa(crypto.randomUUID());
+  const CSP = buildCsp(nonce);
+  const headers = new Headers(request.headers);
+  headers.set('x-nonce', nonce);
+  headers.set('content-security-policy', CSP);
+  const response = NextResponse.next({ request: { headers } });
 
   response.headers.set('content-security-policy', CSP);
   response.headers.set('x-content-type-options', 'nosniff');
@@ -63,15 +69,15 @@ export function middleware(request: NextRequest) {
   );
 
   // COOP/CORP are only honored on secure origins: sending them over plain
-  // HTTP just makes every browser log an "ignored header" console error on
-  // every page load (this app is explicitly designed to run without TLS).
+  // HTTP makes browsers ignore these security headers; enable HTTPS for admin access.
+
   if (isSecureOrigin(request)) {
     response.headers.set('cross-origin-opener-policy', 'same-origin');
     response.headers.set('cross-origin-resource-policy', 'same-origin');
   }
 
-  // HSTS is strictly opt-in: the app works fine over plain HTTP (no cookies,
-  // no authentication), so TLS is never required.
+  // HSTS is opt-in so local self-signed HTTPS does not pin browser policy.
+
   if (process.env.ENABLE_HSTS === 'true') {
     response.headers.set('strict-transport-security', 'max-age=63072000; includeSubDomains');
   }

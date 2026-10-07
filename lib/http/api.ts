@@ -42,19 +42,28 @@ export type ParsedBody =
   | { ok: true; data: unknown }
   | { ok: false; reason: 'empty' | 'invalid' | 'too_large' };
 
-/** Safely parses a JSON request body with a hard size limit. */
+/** Read a bounded UTF-8 body; count bytes and stop before buffering oversized input. */
 export async function readJsonBody(req: Request, maxBytes = 2_000_000): Promise<ParsedBody> {
-  let text: string;
+  const length = req.headers.get('content-length');
+  if (length && Number(length) > maxBytes) return { ok: false, reason: 'too_large' };
+  if (!req.body) return { ok: false, reason: 'empty' };
+  const reader = req.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let bytes = 0;
   try {
-    text = await req.text();
-  } catch {
-    return { ok: false, reason: 'invalid' };
-  }
-  if (text.length > maxBytes) return { ok: false, reason: 'too_large' };
-  if (!text.trim()) return { ok: false, reason: 'empty' };
-  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      bytes += value.byteLength;
+      if (bytes > maxBytes) { await reader.cancel(); return { ok: false, reason: 'too_large' }; }
+      chunks.push(value);
+    }
+    const data = new Uint8Array(bytes);
+    let offset = 0;
+    for (const chunk of chunks) { data.set(chunk, offset); offset += chunk.length; }
+    const text = new TextDecoder('utf-8', { fatal: true }).decode(data);
+    if (!text.trim()) return { ok: false, reason: 'empty' };
     return { ok: true, data: JSON.parse(text) as unknown };
-  } catch {
-    return { ok: false, reason: 'invalid' };
-  }
+  } catch { return { ok: false, reason: 'invalid' }; }
+  finally { reader.releaseLock(); }
 }
