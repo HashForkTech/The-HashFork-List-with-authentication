@@ -4,6 +4,8 @@ A directory of curated resources: GitHub projects, LLMs, models and AI tools. It
 
 **Looking for local deployment without authentication?** The same app is also available without authentication for local deployment: [The HashFork List — without authentication](https://the-list.hashfork.tech/).
 
+**Customize your list name:** Open `/admin`, change **Page title** under **Main page**, and click **Save**.
+
 **Stack:** Next.js (App Router) · TypeScript · React · Tailwind CSS · SQLite / Supabase Postgres
 
 **Admin access requires a password created during first-login setup, with optional authenticator-app 2FA.** The app saves only a salted Argon2id password verifier and uses bearer sessions held in browser memory. It creates no cookies. Serve production admin access over HTTPS.
@@ -26,7 +28,7 @@ A directory of curated resources: GitHub projects, LLMs, models and AI tools. It
 
 **Admin area** (`/admin`)
 
-- Edit the main page title, categories and resources; export and import the data.
+- Change the list name (main page title), manage categories and resources, and export or import data.
 - Same filter bar as the public list.
 - Forms refuse to close with unsaved changes: you get **Save / Discard changes / Keep editing**.
 - Deleting a category keeps its resources (they simply become uncategorized).
