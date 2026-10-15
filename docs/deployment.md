@@ -90,7 +90,7 @@ This helper changes only the mounted `/data` application volume; normal startup 
 
 ## Vercel and Supabase
 
-1. Create a Supabase project and apply `supabase/migrations/202610050001_hashfork.sql` before sending app traffic to it. Paste the SQL into the Supabase SQL editor, or set DATABASE_URL in an ignored local .env and run `node --env-file=.env scripts/migrate-supabase.mjs` using a migration connection. Take a database backup before updating an existing deployment.
+1. Create a Supabase project and apply every SQL file in `supabase/migrations/` in filename order before sending app traffic to it. Paste the SQL into the Supabase SQL editor, or set DATABASE_URL in an ignored local .env and run `node --env-file=.env scripts/migrate-supabase.mjs` using a migration connection. Take a database backup before updating an existing deployment.
 2. Import the repository into Vercel using the Next.js preset. The committed `vercel.json` automatically selects `npm ci --ignore-scripts` for installation and `npm run build` for the build.
 3. Select the Node.js runtime, preferably Node 24. Native SQLite and Argon2 packages require Node; do not move the backend to the Edge runtime. [Vercel's supported Node versions](https://vercel.com/docs/functions/runtimes/node-js/node-js-versions) include Node 24.
 4. Set the server-only variables below for the intended deployment environment.
@@ -117,7 +117,7 @@ Use separate databases and independent auth secrets for Preview and Production. 
 
 ### Schema changes and backups
 
-Apply migrations before deploying code that needs a new schema. Keep migration credentials server-side and restrict the database application role to the project's schema where practical. Database backups contain authentication state, so protect them and store the encryption key separately.
+Apply migrations before deploying code that needs a new schema. The supplied `scripts/migrate-supabase.mjs` runner applies all SQL files in filename order and can be rerun. The GitHub stars migration adds a nullable `BIGINT` column without changing existing authentication state; existing resources keep a blank count until one is entered. Keep migration credentials server-side and restrict the database application role to the project's schema where practical. Database backups contain authentication state, so protect them and store the encryption key separately.
 
 The app's JSON export transfers categories and resources between SQLite and Supabase. It does not migrate passwords, sessions or MFA. For a complete disaster-recovery restore, restore the database and its matching `AUTH_ENCRYPTION_KEY`.
 

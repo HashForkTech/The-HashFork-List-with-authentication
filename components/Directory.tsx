@@ -31,7 +31,7 @@ type DirectoryProps = {
  * unchecking one hides that group, unchecking both hides the whole list.
  * The "Search" field narrows the list down to the resources whose name,
  * description or comment contain the typed text as a substring
- * (case-insensitive). "Sort" orders the rows by newest, name or rating.
+ * (case-insensitive). "Sort" orders the rows by newest, name or GitHub stars.
  * All controls combine — they are never independent.
  *
  * The rows themselves are server-rendered (passed as `children`); filtering
@@ -97,8 +97,8 @@ export function Directory({
         const nameB = b.dataset.itemName ?? '';
         return nameA.localeCompare(nameB, undefined, { sensitivity: 'base' });
       }
-      if (sort === 'rating') {
-        return Number(b.dataset.itemRating ?? 0) - Number(a.dataset.itemRating ?? 0);
+      if (sort === 'githubStars') {
+        return Number(b.dataset.itemGithubStars ?? -1) - Number(a.dataset.itemGithubStars ?? -1);
       }
       // 'newest' — newest first, independent of the previous DOM order.
       return (b.dataset.itemCreated ?? '').localeCompare(a.dataset.itemCreated ?? '');

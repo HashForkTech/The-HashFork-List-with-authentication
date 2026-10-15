@@ -8,7 +8,7 @@ import {
   useState,
   type FormEvent,
 } from 'react';
-import { Pencil, Plus, Star, Trash2 } from 'lucide-react';
+import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { adminApi } from '@/lib/api/admin-client';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { ConfirmDialog, type ConfirmOptions } from '@/components/admin/ConfirmDialog';
@@ -17,6 +17,7 @@ import { SecuritySettings } from '@/components/admin/SecuritySettings';
 import { ItemForm, type ItemFormHandle } from '@/components/admin/ItemForm';
 import { UnsavedChangesDialog } from '@/components/admin/UnsavedChangesDialog';
 import { LinkIcons } from '@/components/LinkIcons';
+import { GitHubStars } from '@/components/GitHubStars';
 import { ResourceFilters } from '@/components/ResourceFilters';
 import { buildSearchText, DEFAULT_FILTERS, filterResources, type ResourceFilterState } from '@/lib/filtering';
 import { isNameDirty } from '@/lib/unsaved';
@@ -36,28 +37,6 @@ type AdminDashboardProps = {
   initialMfaEnabled?: boolean;
   onLogout?: () => Promise<string | null>;
 };
-
-function StarRow({ rating }: { rating: number }) {
-  return (
-    <span
-      className="inline-flex shrink-0 items-center gap-0.5"
-      role="img"
-      aria-label={`Rated ${rating} out of 5 stars`}
-    >
-      {Array.from({ length: 5 }, (_, index) => (
-        <Star
-          key={index}
-          className={
-            index < rating
-              ? 'h-3 w-3 fill-yellow-400 text-yellow-400'
-              : 'h-3 w-3 text-paper/25'
-          }
-          aria-hidden="true"
-        />
-      ))}
-    </span>
-  );
-}
 
 /**
  * Lightweight content management screen:
@@ -99,6 +78,7 @@ export function AdminDashboard({
   const [showCategoryForm, setShowCategoryForm] = useState(false);
   const [categoryName, setCategoryName] = useState('');
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [selectedCategoryId, setSelectedCategoryId] = useState(initialCategories[0]?.id ?? '');
   const [renameValue, setRenameValue] = useState('');
   const [categoryIssues, setCategoryIssues] = useState<string[]>([]);
 
@@ -207,6 +187,7 @@ export function AdminDashboard({
   }, [showItemForm, itemDirty, categoryDirty, categoryCreateDirty, titleDirty]);
 
   const categoryById = new Map(categories.map((category) => [category.id, category]));
+  const selectedCategory = categoryById.get(selectedCategoryId) ?? categories[0];
 
   const refresh = useCallback(async () => {
     const [categoryResult, itemResult] = await Promise.all([
@@ -268,6 +249,7 @@ export function AdminDashboard({
     }
     const created = await createCategory(name);
     if (!created) return false;
+    setSelectedCategoryId(created.id);
     setCategoryName('');
     setShowCategoryForm(false);
     return true;
@@ -578,83 +560,108 @@ export function AdminDashboard({
               No categories yet. The public list also works without categories.
             </p>
           ) : (
-            <ul className="mt-4 space-y-2">
-              {categories.map((category) => (
-                <li
-                  key={category.id}
-                  className="panel flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:gap-4 sm:px-4"
+            <>
+              <div className="mt-4">
+                <label className="sr-only" htmlFor="manage-category">
+                  Manage category
+                </label>
+                <select
+                  id="manage-category"
+                  className="field-input"
+                  value={selectedCategory?.id ?? ''}
+                  onChange={(event) => {
+                    const categoryId = event.target.value;
+                    attemptLeave('category', categoryDirty, () => {
+                      closeCategoryEditor();
+                      setSelectedCategoryId(categoryId);
+                    });
+                  }}
                 >
-                  {editingCategory?.id === category.id ? (
-                    <form
-                      onSubmit={(event) => void handleRenameCategory(event)}
-                      className="flex w-full flex-wrap gap-2"
-                    >
-                      <label className="sr-only" htmlFor={`rename-${category.id}`}>
-                        New category name
-                      </label>
-                      <input
-                        id={`rename-${category.id}`}
-                        className="field-input min-w-0 flex-1"
-                        maxLength={60}
-                        autoFocus
-                        value={renameValue}
-                        onChange={(event) => setRenameValue(event.target.value)}
-                      />
-                      <button type="submit" className="btn btn-primary">
-                        Save
-                      </button>
-                      <button
-                        type="button"
-                        className="btn"
-                        onClick={() =>
-                          attemptLeave('category', categoryDirty, closeCategoryEditor)
-                        }
+                  {categories.map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <ul className="mt-2">
+                {selectedCategory ? (
+                  <li
+                    key={selectedCategory.id}
+                    className="panel flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:gap-4 sm:px-4"
+                  >
+                    {editingCategory?.id === selectedCategory.id ? (
+                      <form
+                        onSubmit={(event) => void handleRenameCategory(event)}
+                        className="flex w-full flex-wrap gap-2"
                       >
-                        Cancel
-                      </button>
-                      {categoryIssues.length > 0 ? (
-                        <ul role="alert" className="field-error w-full space-y-1">
-                          {categoryIssues.map((issue) => (
-                            <li key={issue}>⚠ {issue}</li>
-                          ))}
-                        </ul>
-                      ) : null}
-                    </form>
-                  ) : (
-                    <>
-                      <span className="min-w-0 flex-1 break-words text-sm font-medium text-paper">
-                        {category.name}
-                      </span>
-                      <span className="shrink-0 text-xs text-paper/60">
-                        {category.itemCount} resource{category.itemCount === 1 ? '' : 's'}
-                      </span>
-                      <div className="flex shrink-0 gap-2">
+                        <label className="sr-only" htmlFor={`rename-${selectedCategory.id}`}>
+                          New category name
+                        </label>
+                        <input
+                          id={`rename-${selectedCategory.id}`}
+                          className="field-input min-w-0 flex-1"
+                          maxLength={60}
+                          autoFocus
+                          value={renameValue}
+                          onChange={(event) => setRenameValue(event.target.value)}
+                        />
+                        <button type="submit" className="btn btn-primary">
+                          Save
+                        </button>
                         <button
                           type="button"
                           className="btn"
                           onClick={() =>
-                            attemptLeave('category', categoryDirty, () =>
-                              openCategoryEditor(category),
-                            )
+                            attemptLeave('category', categoryDirty, closeCategoryEditor)
                           }
                         >
-                          <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
-                          Rename
+                          Cancel
                         </button>
-                        <button
-                          type="button"
-                          className="btn btn-danger"
-                          onClick={() => askDeleteCategory(category)}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-                          Delete
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </li>
-              ))}
-            </ul>
+                        {categoryIssues.length > 0 ? (
+                          <ul role="alert" className="field-error w-full space-y-1">
+                            {categoryIssues.map((issue) => (
+                              <li key={issue}>⚠ {issue}</li>
+                            ))}
+                          </ul>
+                        ) : null}
+                      </form>
+                    ) : (
+                      <>
+                        <span className="min-w-0 flex-1 break-words text-sm font-medium text-paper">
+                          {selectedCategory.name}
+                        </span>
+                        <span className="shrink-0 text-xs text-paper/60">
+                          {selectedCategory.itemCount} resource{selectedCategory.itemCount === 1 ? '' : 's'}
+                        </span>
+                        <div className="flex shrink-0 gap-2">
+                          <button
+                            type="button"
+                            className="btn"
+                            onClick={() =>
+                              attemptLeave('category', categoryDirty, () =>
+                                openCategoryEditor(selectedCategory),
+                              )
+                            }
+                          >
+                            <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                            Rename
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-danger"
+                            onClick={() => askDeleteCategory(selectedCategory)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                            Delete
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </li>
+                ) : null}
+              </ul>
+            </>
           )}
         </section>
 
@@ -716,7 +723,6 @@ export function AdminDashboard({
                 const category = item.categoryId
                   ? categoryById.get(item.categoryId)
                   : undefined;
-                const rating = Math.min(5, Math.max(0, Math.round(item.rating ?? 0)));
                 return (
                   <li
                     key={item.id}
@@ -741,7 +747,7 @@ export function AdminDashboard({
                             Tested
                           </span>
                         ) : null}
-                        {rating > 0 ? <StarRow rating={rating} /> : null}
+                        <GitHubStars count={item.githubStars} />
                       </div>
                       {item.description?.trim() ? (
                         <p className="mt-1.5 line-clamp-2 max-w-2xl break-words text-sm leading-relaxed text-paper/65">

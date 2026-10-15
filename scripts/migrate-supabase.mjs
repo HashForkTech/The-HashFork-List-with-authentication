@@ -29,9 +29,13 @@ const pool = new Pool({
 });
 pool.on('error', () => console.error('PostgreSQL connection unavailable.'));
 try {
-  const migration = fs.readFileSync(fileURLToPath(new URL('../supabase/migrations/202610050001_hashfork.sql', import.meta.url)), 'utf8');
-  await pool.query(migration);
-  console.log('Supabase schema initialized. Browser Data API access is disabled for app tables.');
+  const directory = fileURLToPath(new URL('../supabase/migrations/', import.meta.url));
+  const migrations = fs.readdirSync(directory).filter((name) => name.endsWith('.sql')).sort();
+  for (const name of migrations) {
+    await pool.query(fs.readFileSync(new URL('../supabase/migrations/' + name, import.meta.url), 'utf8'));
+    console.log('Applied migration: ' + name);
+  }
+  console.log('Supabase schema is up to date. Browser Data API access is disabled for app tables.');
 } finally {
   await pool.end();
 }

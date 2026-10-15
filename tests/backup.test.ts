@@ -46,6 +46,45 @@ describe('backup export', () => {
 });
 
 describe('backup import', () => {
+  it('round-trips GitHub counts, preserving large counts, zero and missing values', async () => {
+    for (const [name, githubStars] of [['Popular', 123456], ['Zero', 0], ['Missing', null]] as const) {
+      await itemPost(apiRequest('/api/items', { method: 'POST', body: { name, githubStars } }));
+    }
+    const backup = await readJson(await exportGet(apiRequest('/api/export')));
+    expect(backup.version).toBe(4);
+    const res = await importPost(
+      apiRequest('/api/import', {
+        method: 'POST',
+        body: { mode: 'replace', confirm: true, data: backup },
+      }),
+    );
+    expect(res.status).toBe(200);
+    const list = (await readJson(await itemsGet(apiRequest('/api/items')))).items as Array<{
+      name: string;
+      githubStars: number | null;
+    }>;
+    expect(Object.fromEntries(list.map((item) => [item.name, item.githubStars]))).toEqual({
+      Popular: 123456,
+      Zero: 0,
+      Missing: null,
+    });
+  });
+
+  it('accepts older backups without converting a personal rating into a GitHub count', async () => {
+    const res = await importPost(
+      apiRequest('/api/import', {
+        method: 'POST',
+        body: { mode: 'merge', data: { categories: [], items: [{ name: 'Legacy', rating: 5 }] } },
+      }),
+    );
+    expect(res.status).toBe(200);
+    const list = (await readJson(await itemsGet(apiRequest('/api/items')))).items as Array<{
+      name: string;
+      githubStars: number | null;
+    }>;
+    expect(list[0]).toMatchObject({ name: 'Legacy', githubStars: null });
+  });
+
   it('merges a backup without overwriting existing rows', async () => {
     await seed();
     const backup = (await readJson(await exportGet(apiRequest('/api/export')))) as unknown as Backup;

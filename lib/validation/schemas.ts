@@ -27,15 +27,15 @@ const optionalUrlField = () =>
       }
     });
 
-/** Star notation: an integer from 0 to 5 (0 = not rated). */
-const ratingField = () =>
+/** Optional GitHub popularity count, including an explicitly entered zero. */
+const githubStarsField = () =>
   z.preprocess(
     emptyToNull,
     z
       .number()
-      .int('Rating must be a whole number of stars.')
-      .min(0, 'Rating must be between 0 and 5 stars.')
-      .max(5, 'Rating must be between 0 and 5 stars.')
+      .int('GitHub stars must be a whole number.')
+      .min(0, 'GitHub stars cannot be negative.')
+      .max(Number.MAX_SAFE_INTEGER, 'GitHub star count is too large.')
       .nullish(),
   );
 
@@ -65,7 +65,7 @@ export const itemInputSchema = z.object({
   youtubeUrl: optionalUrlField(),
   tested: testedField(),
   testedAt: optionalTimestamp,
-  rating: ratingField(),
+  githubStars: githubStarsField(),
   comment: optionalText(LIMITS.comment),
 });
 
@@ -126,7 +126,7 @@ export const backupItemSchema = z.object({
   youtubeUrl: optionalUrlField(),
   tested: testedField(),
   testedAt: optionalTimestamp,
-  rating: ratingField(),
+  githubStars: githubStarsField(),
   comment: optionalText(LIMITS.comment),
   createdAt: optionalTimestamp,
   updatedAt: optionalTimestamp,
@@ -165,7 +165,7 @@ const FIELD_LABELS: Record<string, string> = {
   youtubeUrl: 'YouTube link',
   tested: 'Tested',
   testedAt: 'Tested at',
-  rating: 'Rating',
+  githubStars: 'GitHub stars',
   comment: 'Comment',
   siteTitle: 'Page title',
   createdAt: 'Created at',

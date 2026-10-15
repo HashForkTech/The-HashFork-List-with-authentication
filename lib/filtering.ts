@@ -119,14 +119,14 @@ export function filtersAreDefault(filters: ResourceFilterState): boolean {
    chosen view survives refreshes and can be shared as a deep link.
    ────────────────────────────────────────────────────────────────────────── */
 
-export const SORT_OPTIONS = ['newest', 'name', 'rating'] as const;
+export const SORT_OPTIONS = ['newest', 'name', 'githubStars'] as const;
 export type SortMode = (typeof SORT_OPTIONS)[number];
 
 export const DEFAULT_SORT: SortMode = 'newest';
 
 /** Guard for values coming back from the URL. */
 export function isSortMode(value: string | null): value is SortMode {
-  return value === 'newest' || value === 'name' || value === 'rating';
+  return value === 'newest' || value === 'name' || value === 'githubStars';
 }
 
 /**
@@ -141,7 +141,8 @@ export function parseFilterParams(search: string): {
   const params = new URLSearchParams(search);
 
   const categoryId = params.get('category');
-  const sortParam = params.get('sort');
+  // Keep bookmarked links to the former rating sort useful.
+  const sortParam = params.get('sort') === 'rating' ? 'githubStars' : params.get('sort');
 
   return {
     filters: {

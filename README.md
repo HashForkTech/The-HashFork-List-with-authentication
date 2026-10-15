@@ -10,7 +10,7 @@ A directory of curated resources: GitHub projects, LLMs, models and AI tools. It
 
 **Admin access requires a password created during first-login setup, with optional authenticator-app 2FA.** The app saves only a salted Argon2id password verifier and uses bearer sessions held in browser memory. It creates no cookies. Serve production admin access over HTTPS.
 
-![The public list: a filter bar with a category menu, Tested and Non-tested checkboxes, a search field and a sort menu, above resource rows that each show a name, an added date, a category chip, link icons, a tested date, a five slot star rating, a Comment button and a two line description](docs/screenshots/public-list.png)
+![The public list with category, tested status, search and sort controls above resource rows showing added and tested dates, category chips, link icons, GitHub star counts, Comment buttons and descriptions](docs/screenshots/public-list.png)
 
 ---
 
@@ -20,15 +20,17 @@ A directory of curated resources: GitHub projects, LLMs, models and AI tools. It
 
 - Resources grouped by category, each with a name, description, links, a category chip and review metadata.
 - Links are shown as icons: GitHub, website, Hugging Face, YouTube.
-- A "Tested" badge with the date it was checked, a star rating from 0 to 5 (drawn on a 5-slot scale), and an optional comment behind a "Comment" button (tap- and keyboard-friendly).
-- Filter bar: category, Tested / Non-tested, and a case-insensitive search over name, description and comment. All three combine, and a sort control orders the list by newest, name or rating.
-- A live result count ("12 of 31 resources") sits under the filter bar with a "Reset filters" shortcut. Filters and sort are mirrored into the URL query string (`/?category=…&tested=0&q=…&sort=rating`), so a view can be bookmarked, shared, and restored after a refresh.
+- A "Tested" badge with the date it was checked, a manually entered GitHub star count displayed as GitHub, one yellow star and the full number, and an optional comment behind a "Comment" button (tap- and keyboard-friendly). Blank counts are hidden; zero is shown.
+- Filter bar: category, Tested / Non-tested, and a case-insensitive search over name, description and comment. All three combine, and a sort control orders the list by newest, name or GitHub star count.
+- A live result count ("12 of 31 resources") sits under the filter bar with a "Reset filters" shortcut. Filters and sort are mirrored into the URL query string (`/?category=…&tested=0&q=…&sort=githubStars`), so a view can be bookmarked, shared, and restored after a refresh.
 - Press `/` anywhere to jump to the search field; `Esc` clears it.
 - Descriptions are clamped to two lines; clicking/tapping, hovering or keyboard-focus reveals the full text in a popover.
 
 **Admin area** (`/admin`)
 
 - Change the list name (main page title), manage categories and resources, and export or import data.
+- Select a category from a dropdown to see its resource count and use the existing Rename and Delete buttons.
+- Enter an optional non-negative whole number under GitHub stars when adding or editing a resource.
 - Same filter bar as the public list.
 - Forms refuse to close with unsaved changes: you get **Save / Discard changes / Keep editing**.
 - Deleting a category keeps its resources (they simply become uncategorized).
@@ -61,31 +63,35 @@ A directory of curated resources: GitHub projects, LLMs, models and AI tools. It
 
 ## Screenshots
 
-Every image below comes from a production build (`npm run build` then `npm run start`) running against a demo database with 17 resources in 5 categories. The image at the top of this file is the default public view.
+These screenshots show the current app running against a demo database with 17 resources in 5 categories. GitHub star counts are illustrative values entered manually for the screenshots, rather than live GitHub totals. The image at the top of this file is the default public view.
 
 ### Public list
 
-Filters and sort mirrored into the URL (`/?category=inference-engines&sort=rating`), with the live result count, the "Reset filters" shortcut, and an open comment popover.
+The Inference Engines category sorted by GitHub stars, most first. Filters and sort are mirrored into the URL (`/?category=inference-engines&sort=githubStars`), with the live result count, the "Reset filters" shortcut, and an open comment popover.
 
-![The public list filtered to the Inference Engines category and sorted by best rated, showing "4 of 17 resources", a "Reset filters" link, category chips, star ratings, and an open comment popover under the first row](docs/screenshots/public-list-filters.png)
+![The Inference Engines category sorted by GitHub stars, showing 4 of 17 resources, Reset filters, GitHub counts with one yellow star each, and an open comment under Ollama](docs/screenshots/public-list-filters.png)
 
-The same list on a phone-sized viewport (390 px wide): the filter bar wraps to two rows and every resource stacks its metadata under the title.
+The same list on a phone: the filter controls wrap above the resources, and each resource's category, links, tested date and GitHub count stack below its title.
 
-![The public list on a 390 pixel wide viewport, with a two row filter bar above stacked resource rows](docs/screenshots/public-list-mobile.png)
+![The public list on a phone with wrapped category, search, tested status and sorting controls, followed by resource rows with GitHub star counts](docs/screenshots/public-list-mobile.png)
 
 ### Admin area
 
-The dashboard at `/admin`: the main page title and the category list with its per-category resource counts.
+Sign in with the admin password before opening the dashboard. Sessions stay in the current tab; refreshing requires sign-in again. Optional authenticator-app 2FA remains available.
 
-![The admin dashboard: header with an ADMIN badge and a View site link, a page title field with a Save button, and a category list where every row shows the name, the number of resources, and Rename and Delete buttons](docs/screenshots/admin-dashboard.png)
+![The Admin sign-in page with a password field, Sign in button, and an explanation of the cookie-free session](docs/screenshots/admin-sign-in.png)
 
-The Resources section, which carries the same filter bar as the public list.
+The authenticated dashboard at `/admin`, with a Sign out button: the main page title and the category dropdown. Only the selected category is shown below the menu, with its resource count and Rename and Delete buttons.
 
-![The admin Resources section: filter bar with category menu, Tested and Non-tested checkboxes, search field and an Add a resource button, above resource cards with category chips, a Tested badge, star ratings, the comment text, and Edit and Delete buttons](docs/screenshots/admin-resources.png)
+![The authenticated Admin dashboard with Sign out, its page title field, a category dropdown set to Chat Interfaces, and one category row showing 4 resources with Rename and Delete buttons](docs/screenshots/admin-dashboard.png)
 
-The resource editor for a single entry: category, name, description, the four link fields, the star rating, the Tested checkbox with its stored check date, and the comment.
+The Resources section carries the same category, tested status and search filters as the public list. Resource cards show the saved GitHub count alongside their review information.
 
-![The admin resource editor filled in for Home Assistant: category set to Home Automation, name, description, website, GitHub and YouTube links, five filled stars, a checked Tested box showing "Last checked on 2026-10-03", a comment, and Save and Cancel buttons](docs/screenshots/admin-resource-editor.png)
+![Admin resource cards for Ollama, Qdrant and Home Assistant, with category chips, Tested badges, GitHub star counts, descriptions, comments, link icons, and Edit and Delete buttons below the resource filters](docs/screenshots/admin-resources.png)
+
+The resource editor includes a GitHub label with one yellow star and a number field. Enter the count manually or leave it blank to hide it; the Tested checkbox, stored check date and comment remain below it.
+
+![The Home Assistant resource editor with category and link fields, a GitHub star count of 83000, a checked Tested box with its stored date, a comment, and Save and Cancel buttons](docs/screenshots/admin-resource-editor.png)
 
 ---
 
@@ -200,12 +206,14 @@ In **Admin → Data & backup**:
 ```json
 {
   "format": "the-hashfork-list/backup",
-  "version": 3,
+  "version": 4,
   "exportedAt": "2026-01-01T12:00:00.000Z",
   "categories": [],
   "items": []
 }
 ```
+
+Version 4 includes `githubStars`. Older backups still import with blank GitHub counts.
 
 **Import** accepts such a file, in one of two modes. The whole file is validated before anything is written, and the import runs as a single transaction, so a bad file changes nothing.
 
@@ -229,7 +237,7 @@ cp backup.sqlite data/hashfork.sqlite
 
 SQLite migrations run automatically when the local database opens. Each version runs once inside a transaction, including the new authentication schema. Preserve your database volume during upgrades.
 
-Supabase uses `supabase/migrations/202610050001_hashfork.sql`. Apply it with the Supabase SQL editor or `node --env-file=.env scripts/migrate-supabase.mjs` before routing traffic to a new database. Keep migrations and database credentials on the server, and take a database backup before upgrading. See [Supabase deployment](docs/deployment.md#vercel-and-supabase).
+Supabase migrations live in `supabase/migrations/`. Run `node --env-file=.env scripts/migrate-supabase.mjs` to apply every SQL file in filename order, or apply each file in that order in the Supabase SQL editor. Run the migrations before starting an upgraded app. The GitHub stars migration adds a nullable `BIGINT` column to existing resources; previous personal ratings are not converted into GitHub counts. Keep migrations and database credentials on the server, and take a database backup before upgrading. See [Supabase deployment](docs/deployment.md#vercel-and-supabase).
 
 
 ## Security model
@@ -354,8 +362,8 @@ What the suite pins down:
 - **Security.** Admin mutations require an active bearer session in addition to cross-origin request checks. Authentication coverage includes first-login setup, session expiry and revocation, password verification, MFA and recovery. Badly shaped and oversized input is rejected.
 - **Backup.** Export, merge import, replace import with and without confirmation, and malformed backup files.
 - **Shared filtering** (`tests/filtering.test.ts`). Case-insensitive substring search over name, description and comment; category + Tested/Non-tested + search combinations; empty queries; resources without a category; URL (de)serialisation of filters and sort, including a query that stays empty for the default view and defaults read back from a malformed query.
-- **Unsaved-changes detection** (`tests/unsaved.test.ts`). Draft normalization (trimmed text, normalized URLs, clamped rating); a reverted edit stays clean; inline "new category" handling; name comparison for categories and titles.
-- **Public list UI** (`tests/ui-directory.test.tsx`, jsdom). Search field placement next to *Non-tested*, filter combinations while typing, the no-match state, two-line description clamping, full description on hover and keyboard focus, empty descriptions, the tap-friendly comment popover, filters restored from and mirrored back into the query string, re-ordering by name and by rating, the live result count, and `/` focusing the search while `Esc` clears it.
+- **Unsaved-changes detection** (`tests/unsaved.test.ts`). Draft normalization (trimmed text, normalized URLs, numeric or blank GitHub counts); a reverted edit stays clean; inline "new category" handling; name comparison for categories and titles.
+- **Public list UI** (`tests/ui-directory.test.tsx`, jsdom). Search field placement next to *Non-tested*, filter combinations while typing, the no-match state, two-line description clamping, full description on hover and keyboard focus, empty descriptions, the tap-friendly comment popover, filters restored from and mirrored back into the query string, re-ordering by name and by GitHub count, the live result count, and `/` focusing the search while `Esc` clears it.
 - **Admin UI** (`tests/ui-admin.test.tsx`, jsdom). The filter bar rendered to the right of the *Resources* heading and the same filter combinations on the dashboard, plus the unsaved-changes guard: leaving normally with no edits, the Save / Discard / Keep editing dialog, saving before switching resources, reverted edits not warning, a half-typed new resource protected the same way, category-rename protection, and the navigation guard.
 
 ## Troubleshooting

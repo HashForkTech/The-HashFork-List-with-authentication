@@ -78,7 +78,7 @@ export async function POST(req: Request): Promise<Response> {
       youtubeUrl: parsed.data.youtubeUrl,
       tested: parsed.data.tested,
       testedAt: parsed.data.testedAt,
-      rating: parsed.data.rating,
+      githubStars: parsed.data.githubStars,
       comment: parsed.data.comment,
     });
 

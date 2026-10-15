@@ -6,7 +6,7 @@ type ItemRow = {
   id: string; category_id: string | null; name: string | null;
   description: string | null; github_url: string | null; website_url: string | null;
   huggingface_url: string | null; youtube_url: string | null;
-  tested: number; tested_at: string | null; rating: number; comment: string | null;
+  tested: number; tested_at: string | null; github_stars: number | string | null; comment: string | null;
   created_at: string; updated_at: string;
 };
 
@@ -15,7 +15,7 @@ function mapItem(row: ItemRow): ListItem {
     id: row.id, categoryId: row.category_id, name: row.name, description: row.description,
     githubUrl: row.github_url, websiteUrl: row.website_url,
     huggingFaceUrl: row.huggingface_url, youtubeUrl: row.youtube_url,
-    tested: Boolean(row.tested), testedAt: row.tested_at, rating: Number(row.rating ?? 0),
+    tested: Boolean(row.tested), testedAt: row.tested_at, githubStars: row.github_stars == null ? null : Number(row.github_stars),
     comment: row.comment, createdAt: row.created_at, updatedAt: row.updated_at,
   };
 }
@@ -36,9 +36,8 @@ export async function getItem(db: Store, id: string): Promise<ListItem | null> {
   return row ? mapItem(row) : null;
 }
 
-function normalizeRating(value: number | null | undefined): number {
-  if (typeof value !== 'number' || !Number.isFinite(value)) return 0;
-  return Math.min(5, Math.max(0, Math.round(value)));
+function normalizeGithubStars(value: number | null | undefined): number | null {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : null;
 }
 
 function normalizeTimestamp(value: string | null | undefined): string | null {
@@ -49,7 +48,7 @@ function normalizeTimestamp(value: string | null | undefined): string | null {
 
 const INSERT_ITEM_SQL = `INSERT INTO items
   (id, category_id, name, description, github_url, website_url, huggingface_url,
-   youtube_url, tested, tested_at, rating, comment, created_at, updated_at)
+   youtube_url, tested, tested_at, github_stars, comment, created_at, updated_at)
   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
 function itemValues(item: ListItem): unknown[] {
@@ -57,7 +56,7 @@ function itemValues(item: ListItem): unknown[] {
     item.id, item.categoryId ?? null, item.name ?? null, item.description ?? null,
     item.githubUrl ?? null, item.websiteUrl ?? null, item.huggingFaceUrl ?? null,
     item.youtubeUrl ?? null, item.tested ? 1 : 0, normalizeTimestamp(item.testedAt),
-    normalizeRating(item.rating), item.comment ?? null, item.createdAt, item.updatedAt,
+    normalizeGithubStars(item.githubStars), item.comment ?? null, item.createdAt, item.updatedAt,
   ];
 }
 
@@ -69,7 +68,7 @@ export async function createItem(db: Store, payload: ItemPayload, id: string = r
     websiteUrl: payload.websiteUrl ?? null, huggingFaceUrl: payload.huggingFaceUrl ?? null,
     youtubeUrl: payload.youtubeUrl ?? null, tested: Boolean(payload.tested),
     testedAt: payload.tested ? normalizeTimestamp(payload.testedAt) ?? now : null,
-    rating: normalizeRating(payload.rating), comment: payload.comment ?? null,
+    githubStars: normalizeGithubStars(payload.githubStars), comment: payload.comment ?? null,
     createdAt: now, updatedAt: now,
   };
   await db.run(INSERT_ITEM_SQL, itemValues(item));
@@ -96,16 +95,16 @@ export async function updateItem(db: Store, id: string, payload: ItemPayload): P
       youtubeUrl: payload.youtubeUrl !== undefined ? payload.youtubeUrl : existing.youtubeUrl,
       tested: Boolean(tested),
       testedAt: tested ? normalizeTimestamp(payload.testedAt) ?? (existing.tested && existing.testedAt ? existing.testedAt : now) : null,
-      rating: normalizeRating(payload.rating !== undefined ? payload.rating : existing.rating),
+      githubStars: normalizeGithubStars(payload.githubStars !== undefined ? payload.githubStars : existing.githubStars),
       comment: payload.comment !== undefined ? payload.comment : existing.comment,
       updatedAt: now,
     };
     await tx.run(`UPDATE items SET category_id = ?, name = ?, description = ?,
       github_url = ?, website_url = ?, huggingface_url = ?, youtube_url = ?,
-      tested = ?, tested_at = ?, rating = ?, comment = ?, updated_at = ? WHERE id = ?`, [
+      tested = ?, tested_at = ?, github_stars = ?, comment = ?, updated_at = ? WHERE id = ?`, [
       item.categoryId, item.name, item.description, item.githubUrl, item.websiteUrl,
       item.huggingFaceUrl, item.youtubeUrl, item.tested ? 1 : 0, item.testedAt,
-      item.rating, item.comment, item.updatedAt, id,
+      item.githubStars, item.comment, item.updatedAt, id,
     ]);
     return item;
   });

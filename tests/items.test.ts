@@ -84,35 +84,55 @@ describe('items', () => {
     expect(res.status).toBe(201);
   });
 
-  it('stores tested, rating and comment', async () => {
+  it('stores tested, a GitHub star count above five and comment', async () => {
     const res = await itemPost(
       apiRequest('/api/items', {
         method: 'POST',
-        body: { name: 'Reviewed', tested: true, rating: 4, comment: 'Works well.' },
+        body: { name: 'Reviewed', tested: true, githubStars: 12345, comment: 'Works well.' },
       }),
     );
     expect(res.status).toBe(201);
     const { item } = (await readJson(res)) as {
-      item: { tested: boolean; rating: number; comment: string | null; testedAt: string | null };
+      item: { tested: boolean; githubStars: number; comment: string | null; testedAt: string | null };
     };
     expect(item.tested).toBe(true);
-    expect(item.rating).toBe(4);
+    expect(item.githubStars).toBe(12345);
     expect(item.comment).toBe('Works well.');
     expect(item.testedAt).toBeTruthy(); // check date stamped automatically
   });
 
-  it('defaults tested to false and rating to 0', async () => {
+  it('defaults tested to false and GitHub stars to null', async () => {
     const res = await itemPost(
       apiRequest('/api/items', { method: 'POST', body: { name: 'Plain' } }),
     );
     expect(res.status).toBe(201);
     const { item } = (await readJson(res)) as {
-      item: { tested: boolean; rating: number; comment: string | null; testedAt: string | null };
+      item: { tested: boolean; githubStars: number | null; comment: string | null; testedAt: string | null };
     };
     expect(item.tested).toBe(false);
-    expect(item.rating).toBe(0);
+    expect(item.githubStars).toBeNull();
     expect(item.comment).toBeNull();
     expect(item.testedAt).toBeNull();
+  });
+
+  it('preserves GitHub stars on unrelated edits and distinguishes zero from a cleared count', async () => {
+    const created = await itemPost(
+      apiRequest('/api/items', { method: 'POST', body: { name: 'Stars', githubStars: 98765 } }),
+    );
+    const { item } = (await readJson(created)) as { item: { id: string } };
+    for (const [patch, expected] of [
+      [{ name: 'Renamed' }, 98765],
+      [{ githubStars: 0 }, 0],
+      [{ githubStars: null }, null],
+    ] as const) {
+      const res = await itemPatch(
+        apiRequest(`/api/items/${item.id}`, { method: 'PATCH', body: patch }),
+        routeContext(item.id),
+      );
+      expect(res.status).toBe(200);
+      const updated = (await readJson(res)).item as { githubStars: number | null };
+      expect(updated.githubStars).toBe(expected);
+    }
   });
 
   it('stamps the check date when tested is checked and clears it when unchecked', async () => {
@@ -176,17 +196,17 @@ describe('items', () => {
     const res = await itemPatch(
       apiRequest(`/api/items/${item.id}`, {
         method: 'PATCH',
-        body: { tested: true, rating: 5 },
+        body: { tested: true, githubStars: 5 },
       }),
       routeContext(item.id),
     );
     expect(res.status).toBe(200);
     const { item: updated } = (await readJson(res)) as {
-      item: { name: string; tested: boolean; rating: number; comment: string | null };
+      item: { name: string; tested: boolean; githubStars: number; comment: string | null };
     };
     expect(updated.name).toBe('Patch me'); // untouched
     expect(updated.tested).toBe(true);
-    expect(updated.rating).toBe(5);
+    expect(updated.githubStars).toBe(5);
     expect(updated.comment).toBeNull();
   });
 

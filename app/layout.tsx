@@ -9,7 +9,7 @@ import './globals.css';
 // characters so search engines and link previews don't cut the end off. It
 // deliberately omits the site name: the title is admin-configurable.
 const SITE_DESCRIPTION =
-  'A self-hosted, hand-curated directory of GitHub projects, LLMs, models and AI tools — each with a tested-on date, star rating and notes.';
+  'A self-hosted, hand-curated directory of GitHub projects, LLMs, models and AI tools — each with a tested-on date, GitHub star count and notes.';
 
 const appUrl = process.env.APP_URL?.trim() || 'http://localhost:3000';
 

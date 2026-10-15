@@ -27,7 +27,7 @@ export type ItemDraft = {
   huggingFaceUrl: string;
   youtubeUrl: string;
   tested: boolean;
-  rating: number;
+  githubStars: number | null;
 };
 
 /** Sentinel used by the category drop-down for the "＋ New category…" option. */
@@ -43,7 +43,7 @@ export const EMPTY_ITEM_DRAFT: ItemDraft = {
   huggingFaceUrl: '',
   youtubeUrl: '',
   tested: false,
-  rating: 0,
+  githubStars: null,
 };
 
 /** Raw values as currently held by the resource form. */
@@ -59,7 +59,7 @@ export type ItemDraftInput = {
   huggingFaceUrl: string;
   youtubeUrl: string;
   tested: boolean;
-  rating: number;
+  githubStars: string | number | null;
 };
 
 /**
@@ -85,10 +85,6 @@ function normalizeUrlValue(value: string | null | undefined): string {
   return normalizeUrl(raw) ?? raw;
 }
 
-function clampRating(value: number | null | undefined): number {
-  return Math.min(5, Math.max(0, Math.round(value ?? 0)));
-}
-
 /** Builds the comparable draft of the values currently typed in a form. */
 export function itemDraftFromForm(input: ItemDraftInput): ItemDraft {
   return {
@@ -101,7 +97,10 @@ export function itemDraftFromForm(input: ItemDraftInput): ItemDraft {
     huggingFaceUrl: normalizeUrlValue(input.huggingFaceUrl),
     youtubeUrl: normalizeUrlValue(input.youtubeUrl),
     tested: Boolean(input.tested),
-    rating: clampRating(input.rating),
+    githubStars:
+      input.githubStars == null || String(input.githubStars).trim() === ''
+        ? null
+        : Number(input.githubStars),
   };
 }
 
@@ -117,7 +116,7 @@ export function itemDraftFromItem(item?: ListItem | null): ItemDraft {
     huggingFaceUrl: item?.huggingFaceUrl ?? '',
     youtubeUrl: item?.youtubeUrl ?? '',
     tested: Boolean(item?.tested),
-    rating: item?.rating ?? 0,
+    githubStars: item?.githubStars ?? null,
   });
 }
 
@@ -137,7 +136,7 @@ export function isItemDraftDirty(saved: ItemDraft, draft: ItemDraft): boolean {
     saved.huggingFaceUrl !== draft.huggingFaceUrl ||
     saved.youtubeUrl !== draft.youtubeUrl ||
     saved.tested !== draft.tested ||
-    saved.rating !== draft.rating
+    saved.githubStars !== draft.githubStars
   );
 }
 

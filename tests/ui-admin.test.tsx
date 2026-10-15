@@ -54,7 +54,7 @@ function item(patch: Partial<ListItem> & { id: string }): ListItem {
     youtubeUrl: null,
     tested: false,
     testedAt: null,
-    rating: 0,
+    githubStars: null,
     comment: null,
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
@@ -68,6 +68,7 @@ const items: ListItem[] = [
     categoryId: 'tools',
     tested: true,
     name: 'Ollama',
+    githubStars: 12345,
     description: 'Runs python LLM tooling locally.',
   }),
   item({
@@ -125,6 +126,81 @@ beforeEach(() => {
 });
 
 afterEach(cleanup);
+
+describe('Admin — GitHub stars', () => {
+  it('prefills the saved count and shows it with one star in the resource list', () => {
+    renderDashboard();
+    const badge = within(rowByName('Ollama')).getByRole('img', { name: 'GitHub: 12345 stars' });
+    expect(badge.querySelectorAll('svg')).toHaveLength(1);
+    fireEvent.click(within(rowByName('Ollama')).getByRole('button', { name: 'Edit' }));
+    expect((screen.getByRole('spinbutton', { name: 'GitHub stars' }) as HTMLInputElement).value).toBe('12345');
+    expect(screen.queryByText('Rating')).toBeNull();
+  });
+
+  it.each([['45678', 45678], ['0', 0], ['', null]] as const)(
+    'saves the GitHub star input %j as %j',
+    async (value, expected) => {
+      renderDashboard();
+      fireEvent.click(within(rowByName('Ollama')).getByRole('button', { name: 'Edit' }));
+      fireEvent.change(screen.getByRole('spinbutton', { name: 'GitHub stars' }), { target: { value } });
+      fireEvent.click(within(screen.getByRole('form', { name: 'Edit resource' })).getByRole('button', { name: 'Save' }));
+      await waitFor(() => expect(api.updateItem).toHaveBeenCalledWith(
+        'python-tested', expect.objectContaining({ githubStars: expected }),
+      ));
+    },
+  );
+
+  it.each(['-1', '2.5', '9007199254740992'])(
+    'rejects an invalid GitHub count %s before saving',
+    (value) => {
+      renderDashboard();
+      fireEvent.click(screen.getByRole('button', { name: 'Add a resource' }));
+      const input = screen.getByRole('spinbutton', { name: 'GitHub stars' });
+      fireEvent.change(input, { target: { value } });
+      fireEvent.click(within(screen.getByRole('form', { name: 'Add a resource' })).getByRole('button', { name: 'Save' }));
+      expect(screen.getByText('Enter a non-negative whole number of GitHub stars.')).toBeTruthy();
+      expect(api.createItem).not.toHaveBeenCalled();
+    },
+  );
+});
+
+describe('Admin — category dropdown', () => {
+  function section() {
+    return document.querySelector('section[aria-labelledby="categories-title"]') as HTMLElement;
+  }
+
+  it('lists every category in the dropdown and shows just one row with its actions', () => {
+    renderDashboard();
+    const select = screen.getByRole('combobox', { name: 'Manage category' });
+    expect(within(select).getAllByRole('option').map((option) => option.textContent)).toEqual(['Tools', 'Security']);
+    expect(section().querySelectorAll('li')).toHaveLength(1);
+    expect(within(section()).getAllByRole('button', { name: 'Rename' })).toHaveLength(1);
+    expect(within(section()).getAllByRole('button', { name: 'Delete' })).toHaveLength(1);
+    fireEvent.change(select, { target: { value: 'security' } });
+    expect(section().querySelector('li')?.textContent).toContain('Security');
+    expect(within(section()).getByText('2 resources')).toBeTruthy();
+  });
+
+  it('renames the category chosen in the dropdown', async () => {
+    renderDashboard();
+    fireEvent.change(screen.getByLabelText('Manage category'), { target: { value: 'security' } });
+    fireEvent.click(within(section()).getByRole('button', { name: 'Rename' }));
+    fireEvent.change(screen.getByLabelText('New category name'), { target: { value: 'Security tools' } });
+    fireEvent.click(within(section()).getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(api.updateCategory).toHaveBeenCalledWith('security', 'Security tools'));
+  });
+
+  it('deletes the chosen category and selects a remaining category after refresh', async () => {
+    renderDashboard();
+    api.listCategories.mockResolvedValue(ok({ categories: [categories[0]] }));
+    fireEvent.change(screen.getByLabelText('Manage category'), { target: { value: 'security' } });
+    fireEvent.click(within(section()).getByRole('button', { name: 'Delete' }));
+    fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete category' }));
+    await waitFor(() => expect(api.deleteCategory).toHaveBeenCalledWith('security'));
+    await waitFor(() => expect((screen.getByLabelText('Manage category') as HTMLSelectElement).value).toBe('tools'));
+    expect(rowNames()).toHaveLength(items.length);
+  });
+});
 
 describe('Admin — filter bar placement', () => {
   it('renders the same controls to the right of the "Resources" heading', () => {
@@ -345,6 +421,8 @@ describe('Admin — unsaved category changes', () => {
   }
 
   function openRename(name: string) {
+    const category = categories.find((entry) => entry.name === name)!;
+    fireEvent.change(screen.getByLabelText('Manage category'), { target: { value: category.id } });
     fireEvent.click(within(categoryRow(name)).getByRole('button', { name: 'Rename' }));
     return screen.getByLabelText('New category name');
   }
@@ -385,12 +463,12 @@ describe('Admin — unsaved category changes', () => {
     expect(screen.queryByRole('alertdialog')).toBeNull();
   });
 
-  it('guards switching to another category rename form', async () => {
+  it('guards switching the category dropdown while a rename is unsaved', async () => {
     renderDashboard();
     const input = openRename('Tools');
     fireEvent.change(input, { target: { value: 'Tools renamed' } });
 
-    fireEvent.click(within(categoryRow('Security')).getByRole('button', { name: 'Rename' }));
+    fireEvent.change(screen.getByLabelText('Manage category'), { target: { value: 'security' } });
     expect(screen.getByRole('alertdialog')).toBeTruthy();
 
     fireEvent.click(
@@ -399,12 +477,13 @@ describe('Admin — unsaved category changes', () => {
     expect((screen.getByLabelText('New category name') as HTMLInputElement).value).toBe(
       'Tools renamed',
     );
+    expect((screen.getByLabelText('Manage category') as HTMLSelectElement).value).toBe('tools');
   });
 
   it('keeps the normal rename behaviour without changes', async () => {
     renderDashboard();
     openRename('Tools');
-    fireEvent.click(within(categoryRow('Security')).getByRole('button', { name: 'Rename' }));
+    openRename('Security');
     expect(screen.queryByRole('alertdialog')).toBeNull();
     expect((screen.getByLabelText('New category name') as HTMLInputElement).value).toBe('Security');
   });

@@ -1,4 +1,4 @@
-import { Star } from 'lucide-react';
+import { GitHubStars } from '@/components/GitHubStars';
 import { CommentButton } from '@/components/CommentButton';
 import { DescriptionText } from '@/components/DescriptionText';
 import { LinkIcons } from '@/components/LinkIcons';
@@ -13,8 +13,8 @@ import type { ListItem } from '@/lib/types';
  *            resource is created), the category chip (when categorised),
  *            then the icon links when the matching URLs exist
  *            right: "Tested on <date>" (when checked — the date is when the
- *                   admin checked the "Tested" checkbox), stars on a 5-slot
- *                   scale (only the rated ones — none when unrated),
+ *                   admin checked the "Tested" checkbox), GitHub star count
+ *                   (only when entered),
  *                   "Comment" button (when a comment exists; tapping it
  *                   toggles the note popover)
  *   line 2 → description (muted, clamped to two lines; tapping/hovering/
@@ -24,30 +24,8 @@ import type { ListItem } from '@/lib/types';
  * "Tested" and search filters toggle visibility and the sort control
  * re-orders rows, all through the DOM — so the row DOM survives every view
  * change. The searchable text rides on `data-item-search`; `data-item-
- * created` / `-name` / `-rating` drive the sorting.
+ * created` / `-name` / `-github-stars` drive the sorting.
  */
-
-function Stars({ rating }: { rating: number }) {
-  return (
-    <span
-      className="inline-flex items-center gap-0.5"
-      role="img"
-      aria-label={`Rated ${rating} out of 5 stars`}
-    >
-      {Array.from({ length: 5 }, (_, index) => (
-        <Star
-          key={index}
-          className={
-            index < rating
-              ? 'h-3.5 w-3.5 fill-yellow-400 text-yellow-400'
-              : 'h-3.5 w-3.5 text-paper/25'
-          }
-          aria-hidden="true"
-        />
-      ))}
-    </span>
-  );
-}
 
 type ItemRowProps = {
   item: ListItem;
@@ -57,7 +35,6 @@ type ItemRowProps = {
 
 export function ItemRow({ item, categoryName }: ItemRowProps) {
   const name = item.name?.trim();
-  const rating = Math.min(5, Math.max(0, Math.round(item.rating ?? 0)));
   const comment = item.comment?.trim();
   const description = item.description?.trim();
   const addedAt = formatOsDate(item.createdAt);
@@ -72,7 +49,7 @@ export function ItemRow({ item, categoryName }: ItemRowProps) {
       data-item-search={buildSearchText(item)}
       data-item-created={item.createdAt}
       data-item-name={(name ?? '').toLocaleLowerCase()}
-      data-item-rating={rating}
+      data-item-github-stars={item.githubStars ?? -1}
       className="border-b border-paper/10 transition-colors duration-150 hover:bg-paper/[0.03]"
     >
       <div className="px-1 py-5 sm:px-3">
@@ -103,7 +80,7 @@ export function ItemRow({ item, categoryName }: ItemRowProps) {
                 {testedAt ? `Tested on ${testedAt}` : 'Tested'}
               </span>
             ) : null}
-            {rating > 0 ? <Stars rating={rating} /> : null}
+            <GitHubStars count={item.githubStars} />
             {comment ? <CommentButton id={item.id} comment={comment} /> : null}
           </div>
         </div>

@@ -174,6 +174,10 @@ describe('filterResources', () => {
 });
 
 describe('URL (de)serialisation', () => {
+  it('keeps old bookmarked rating sorts useful', () => {
+    expect(parseFilterParams('?sort=rating').sort).toBe('githubStars');
+  });
+
   it('round-trips non-default filters and sort', () => {
     const state: ResourceFilterState = {
       categoryId: 'cat-1',
@@ -181,11 +185,11 @@ describe('URL (de)serialisation', () => {
       showUntested: true,
       query: 'llm',
     };
-    const query = buildFilterParams(state, 'rating');
-    expect(query).toBe('category=cat-1&tested=0&q=llm&sort=rating');
+    const query = buildFilterParams(state, 'githubStars');
+    expect(query).toBe('category=cat-1&tested=0&q=llm&sort=githubStars');
     const parsed = parseFilterParams(`?${query}`);
     expect(parsed.filters).toEqual(state);
-    expect(parsed.sort).toBe('rating');
+    expect(parsed.sort).toBe('githubStars');
   });
 
   it('writes nothing for default state and reads defaults from garbage', () => {

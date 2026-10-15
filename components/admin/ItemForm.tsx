@@ -31,7 +31,7 @@ const URL_FIELDS = [
 ] as const;
 
 type UrlFieldKey = (typeof URL_FIELDS)[number]['key'];
-type FieldKey = 'categoryId' | 'name' | 'description' | 'comment' | UrlFieldKey;
+type FieldKey = 'categoryId' | 'name' | 'description' | 'comment' | 'githubStars' | UrlFieldKey;
 type Fields = Record<FieldKey, string>;
 
 const NEW_CATEGORY_VALUE = NEW_CATEGORY_SELECTION;
@@ -65,6 +65,7 @@ function initialFields(initial?: ListItem | null): Fields {
     githubUrl: initial?.githubUrl ?? '',
     huggingFaceUrl: initial?.huggingFaceUrl ?? '',
     youtubeUrl: initial?.youtubeUrl ?? '',
+    githubStars: initial?.githubStars?.toString() ?? '',
   };
 }
 
@@ -74,7 +75,7 @@ function initialFields(initial?: ListItem | null): Fields {
  * URLs are validated and normalized before submission.
  *
  * Review metadata: a "Tested" checkbox (the date of the check is stamped and
- * shown as "Tested on …" on the public list), a 1–5 star rating and a comment
+ * shown as "Tested on …" on the public list), a GitHub star count and a comment
  * (shown as a hover popup next to "Comment" on the public list).
  */
 export function ItemForm({
@@ -94,9 +95,6 @@ export function ItemForm({
   // was not touched (keep the saved check date), otherwise the moment the admin
   // checked it (`null` when it was unchecked again).
   const [testedCheckedAt, setTestedCheckedAt] = useState<string | null | undefined>(undefined);
-  const [rating, setRating] = useState<number>(() =>
-    Math.min(5, Math.max(0, Math.round(initial?.rating ?? 0))),
-  );
   const [creatingCategory, setCreatingCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [categoryBusy, setCategoryBusy] = useState(false);
@@ -113,7 +111,7 @@ export function ItemForm({
     fields.huggingFaceUrl.trim() === '' &&
     fields.youtubeUrl.trim() === '' &&
     !tested &&
-    rating === 0;
+    fields.githubStars.trim() === '';
 
   // Unsaved-changes detection: the current values are normalized exactly like
   // the save path normalizes them, then compared with the loaded values, so
@@ -132,9 +130,9 @@ export function ItemForm({
         huggingFaceUrl: fields.huggingFaceUrl,
         youtubeUrl: fields.youtubeUrl,
         tested,
-        rating,
+        githubStars: fields.githubStars,
       }),
-    [fields, newCategoryName, tested, rating],
+    [fields, newCategoryName, tested],
   );
   const dirty = isItemDraftDirty(savedDraft, currentDraft);
 
@@ -179,6 +177,10 @@ export function ItemForm({
   /** Validates and submits; resolves `true` when the save actually succeeded. */
   async function save(): Promise<boolean> {
     const nextErrors: Partial<Record<FieldKey, string>> = {};
+    const githubStars = fields.githubStars.trim() === '' ? null : Number(fields.githubStars);
+    if (githubStars !== null && (!Number.isSafeInteger(githubStars) || githubStars < 0)) {
+      nextErrors.githubStars = 'Enter a non-negative whole number of GitHub stars.';
+    }
     for (const urlField of URL_FIELDS) {
       const value = fields[urlField.key].trim();
       if (value && !normalizeUrl(value)) {
@@ -210,7 +212,7 @@ export function ItemForm({
       youtubeUrl: fields.youtubeUrl.trim() ? normalizeUrl(fields.youtubeUrl) : null,
       tested,
       testedAt: testedCheckedAt,
-      rating: rating > 0 ? rating : null,
+      githubStars,
     };
 
     const result = await onSubmit(payload);
@@ -341,42 +343,27 @@ export function ItemForm({
         ))}
 
         <div>
-          <span className="field-label" id="item-rating-label">
-            Rating
-          </span>
-          <div
-            role="group"
-            aria-labelledby="item-rating-label"
-            className="mt-1.5 flex items-center gap-1"
-          >
-            {[1, 2, 3, 4, 5].map((value) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => setRating((current) => (current === value ? 0 : value))}
-                aria-pressed={rating >= value}
-                aria-label={`${value} star${value > 1 ? 's' : ''}`}
-                title={
-                  rating === value
-                    ? 'Click again to clear the rating'
-                    : `Rate ${value} star${value > 1 ? 's' : ''}`
-                }
-                className="rounded-sm p-1 transition-transform duration-150 hover:scale-110"
-              >
-                <Star
-                  className={`h-6 w-6 ${
-                    rating >= value ? 'fill-yellow-400 text-yellow-400' : 'text-paper/30'
-                  }`}
-                  aria-hidden="true"
-                />
-              </button>
-            ))}
-            <span className="ml-2 text-xs text-paper/50">
-              {rating > 0 ? `${rating} / 5` : 'Not rated'}
-            </span>
-          </div>
-          <p className="field-hint">
-            Click a star to rate from 1 to 5. Click the same star again to clear.
+          <label className="field-label flex items-center gap-1.5" htmlFor="item-github-stars">
+            GitHub
+            <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" aria-hidden="true" />
+            <span className="sr-only">stars</span>
+          </label>
+          <input
+            id="item-github-stars"
+            aria-label="GitHub stars"
+            type="number"
+            min={0}
+            max={Number.MAX_SAFE_INTEGER}
+            step={1}
+            className="field-input"
+            placeholder="Number of stars"
+            value={fields.githubStars}
+            onChange={(event) => setField('githubStars', event.target.value)}
+            aria-invalid={Boolean(errors.githubStars)}
+            aria-describedby="item-github-stars-hint"
+          />
+          <p id="item-github-stars-hint" className={errors.githubStars ? 'field-error' : 'field-hint'}>
+            {errors.githubStars ?? 'Enter the number of GitHub stars. Leave blank to hide it.'}
           </p>
         </div>
 
@@ -422,7 +409,7 @@ export function ItemForm({
       {isEmpty ? (
         <p className="field-hint mt-5">
           ⓘ All fields are empty: this resource will be saved without a name, description,
-          category, link, rating or comment.
+          category, link, GitHub star count or comment.
         </p>
       ) : null}
 

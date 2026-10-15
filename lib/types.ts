@@ -30,8 +30,8 @@ export type ListItem = {
    * admin checks the "Tested" checkbox, cleared when it is unchecked.
    */
   testedAt?: string | null;
-  /** Star notation from 0 to 5 (0 = not rated). */
-  rating: number;
+  /** Manually entered GitHub star count; null when not provided. */
+  githubStars: number | null;
   /** Optional admin comment (shown as a hover popup on the public list). */
   comment?: string | null;
   createdAt: string;
@@ -53,12 +53,12 @@ export type ItemPayload = {
    * resource becomes tested, the server stamps the check date itself.
    */
   testedAt?: string | null;
-  rating?: number | null;
+  githubStars?: number | null;
   comment?: string | null;
 };
 
 export const BACKUP_FORMAT = 'the-hashfork-list/backup';
-export const BACKUP_VERSION = 3;
+export const BACKUP_VERSION = 4;
 
 export type BackupFile = {
   format: typeof BACKUP_FORMAT;

@@ -97,20 +97,27 @@ describe('itemInputSchema', () => {
     expect(itemInputSchema.safeParse({ name: 'x'.repeat(LIMITS.name + 1) }).success).toBe(false);
   });
 
-  it('accepts tested, rating and comment', () => {
-    const parsed = itemInputSchema.safeParse({ tested: true, rating: 4, comment: 'Solid tool.' });
+  it('accepts tested, a GitHub star count above five and comment', () => {
+    const parsed = itemInputSchema.safeParse({ tested: true, githubStars: 12345, comment: 'Solid tool.' });
     expect(parsed.success).toBe(true);
     if (parsed.success) {
       expect(parsed.data.tested).toBe(true);
-      expect(parsed.data.rating).toBe(4);
+      expect(parsed.data.githubStars).toBe(12345);
       expect(parsed.data.comment).toBe('Solid tool.');
     }
   });
 
-  it('rejects a rating outside 0–5', () => {
-    expect(itemInputSchema.safeParse({ rating: 6 }).success).toBe(false);
-    expect(itemInputSchema.safeParse({ rating: -1 }).success).toBe(false);
-    expect(itemInputSchema.safeParse({ rating: 2.5 }).success).toBe(false);
+  it('accepts zero and an omitted or cleared GitHub star count', () => {
+    for (const githubStars of [0, null, '', undefined]) {
+      expect(itemInputSchema.safeParse({ githubStars }).success).toBe(true);
+    }
+  });
+
+  it('rejects negative, fractional and unsafe GitHub star counts', () => {
+    expect(itemInputSchema.safeParse({ githubStars: Number.MAX_SAFE_INTEGER + 1 }).success).toBe(false);
+    expect(itemInputSchema.safeParse({ githubStars: -1 }).success).toBe(false);
+    expect(itemInputSchema.safeParse({ githubStars: 2.5 }).success).toBe(false);
+    expect(itemInputSchema.safeParse({ githubStars: '123' }).success).toBe(false);
   });
 
   it('rejects an over-long comment', () => {

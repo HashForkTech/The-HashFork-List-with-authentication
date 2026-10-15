@@ -22,7 +22,7 @@ const savedItem: ListItem = {
   youtubeUrl: null,
   tested: true,
   testedAt: '2026-01-01T00:00:00.000Z',
-  rating: 4,
+  githubStars: 4,
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
 };
@@ -38,19 +38,19 @@ function form(patch: Partial<ItemDraftInput> = {}): ItemDraftInput {
     huggingFaceUrl: '',
     youtubeUrl: '',
     tested: true,
-    rating: 4,
+    githubStars: 4,
     ...patch,
   };
 }
 
 describe('itemDraftFromForm / itemDraftFromItem', () => {
-  it('normalizes text, URLs and rating the same way the save path does', () => {
+  it('normalizes text, URLs and GitHub star input the same way the save path does', () => {
     const draft = itemDraftFromForm(
-      form({ name: '  Ollama  ', websiteUrl: 'ollama.com', rating: 4.4 }),
+      form({ name: '  Ollama  ', websiteUrl: 'ollama.com', githubStars: ' 12345 ' }),
     );
     expect(draft.name).toBe('Ollama');
     expect(draft.websiteUrl).toBe('https://ollama.com/');
-    expect(draft.rating).toBe(4);
+    expect(draft.githubStars).toBe(12345);
   });
 
   it('maps empty and null values to the same draft', () => {
@@ -58,6 +58,8 @@ describe('itemDraftFromForm / itemDraftFromItem', () => {
     expect(itemDraftFromItem({ ...savedItem, name: null, description: '' })).toEqual(
       itemDraftFromForm(form({ name: '', description: '' })),
     );
+    expect(itemDraftFromForm(form({ githubStars: '' })).githubStars).toBeNull();
+    expect(itemDraftFromForm(form({ githubStars: '0' })).githubStars).toBe(0);
   });
 });
 
@@ -97,12 +99,12 @@ describe('isItemDraftDirty', () => {
       true,
     );
     expect(isItemDraftDirty(saved, itemDraftFromForm(form({ tested: false })))).toBe(true);
-    expect(isItemDraftDirty(saved, itemDraftFromForm(form({ rating: 5 })))).toBe(true);
-    expect(isItemDraftDirty(saved, itemDraftFromForm(form({ rating: 0 })))).toBe(true);
+    expect(isItemDraftDirty(saved, itemDraftFromForm(form({ githubStars: 5 })))).toBe(true);
+    expect(isItemDraftDirty(saved, itemDraftFromForm(form({ githubStars: 0 })))).toBe(true);
   });
 
   it('is clean again when the edits are reverted to the saved values', () => {
-    const changed = itemDraftFromForm(form({ name: 'Something else', rating: 1, tested: false }));
+    const changed = itemDraftFromForm(form({ name: 'Something else', githubStars: 1, tested: false }));
     expect(isItemDraftDirty(saved, changed)).toBe(true);
     const reverted = itemDraftFromForm(form());
     expect(isItemDraftDirty(saved, reverted)).toBe(false);
@@ -135,10 +137,10 @@ describe('isItemDraftDirty', () => {
 
   it('is clean for a brand-new empty form and dirty once anything is typed', () => {
     const emptySaved = itemDraftFromItem(null);
-    expect(isItemDraftDirty(emptySaved, itemDraftFromForm(form({ categoryId: '', name: '', description: '', comment: '', websiteUrl: '', githubUrl: '', tested: false, rating: 0 })))).toBe(
+    expect(isItemDraftDirty(emptySaved, itemDraftFromForm(form({ categoryId: '', name: '', description: '', comment: '', websiteUrl: '', githubUrl: '', tested: false, githubStars: '' })))).toBe(
       false,
     );
-    expect(isItemDraftDirty(emptySaved, itemDraftFromForm(form({ categoryId: '', name: 'New', description: '', comment: '', websiteUrl: '', githubUrl: '', tested: false, rating: 0 })))).toBe(
+    expect(isItemDraftDirty(emptySaved, itemDraftFromForm(form({ categoryId: '', name: 'New', description: '', comment: '', websiteUrl: '', githubUrl: '', tested: false, githubStars: '' })))).toBe(
       true,
     );
   });

@@ -25,7 +25,7 @@ type ResourceFiltersProps = {
 const SORT_LABELS: Record<SortMode, string> = {
   newest: 'Newest first',
   name: 'Name (A–Z)',
-  rating: 'Best rated',
+  githubStars: 'GitHub stars (most first)',
 };
 
 /**

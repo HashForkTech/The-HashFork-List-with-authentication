@@ -43,7 +43,10 @@ describe.skipIf(!testUrl)('PostgreSQL integration', () => {
     vi.stubEnv('TRUST_PROXY', 'false');
     const initializer = new Pool({ connectionString: scopedUrl.toString(), max: 1, ssl: false });
     try {
-      await initializer.query(fs.readFileSync(path.join(process.cwd(), 'supabase/migrations/202610050001_hashfork.sql'), 'utf8'));
+      const directory = path.join(process.cwd(), 'supabase/migrations');
+      for (const name of fs.readdirSync(directory).filter((name) => name.endsWith('.sql')).sort()) {
+        await initializer.query(fs.readFileSync(path.join(directory, name), 'utf8'));
+      }
     } finally { await initializer.end(); }
   });
 
@@ -68,7 +71,7 @@ describe.skipIf(!testUrl)('PostgreSQL integration', () => {
     const store = getStore();
     expect(store.dialect).toBe('postgres');
     const category = await createCategory(store, 'models', 'category');
-    await createItem(store, { categoryId: category.id, name: 'original', tested: true, rating: 4 }, 'item');
+    await createItem(store, { categoryId: category.id, name: 'original', tested: true, githubStars: 123456 }, 'item');
     expect((await listCategories(store))[0].itemCount).toBe(1);
     expect((await updateItem(store, 'item', { description: 'updated' }))?.name).toBe('original');
     await setSiteTitle(store, 'Postgres library');
@@ -82,6 +85,23 @@ describe.skipIf(!testUrl)('PostgreSQL integration', () => {
     expect((await getItem(store, 'item'))?.name).toBe('original');
     expect(await deleteCategory(store, category.id)).toEqual({ deleted: true, detachedItems: 1 });
     expect((await getItem(store, 'item'))?.categoryId).toBeNull();
+  });
+
+  it('round-trips bigint GitHub counts and preserves zero, clearing and unrelated edits', async () => {
+    const store = getStore();
+    await createItem(store, { githubStars: 123456 }, 'stars');
+    expect((await getItem(store, 'stars'))?.githubStars).toBe(123456);
+    expect((await updateItem(store, 'stars', { name: 'Renamed' }))?.githubStars).toBe(123456);
+    expect((await updateItem(store, 'stars', { githubStars: 0 }))?.githubStars).toBe(0);
+    expect((await getItem(store, 'stars'))?.githubStars).toBe(0);
+    expect((await updateItem(store, 'stars', { githubStars: null }))?.githubStars).toBeNull();
+    await expect(store.run('UPDATE items SET github_stars = ? WHERE id = ?', [-1, 'stars'])).rejects.toThrow();
+    await expect(store.run('UPDATE items SET github_stars = ? WHERE id = ?', ['9007199254740992', 'stars'])).rejects.toThrow();
+    await createItem(store, { githubStars: Number.MAX_SAFE_INTEGER }, 'maximum');
+    expect((await getItem(store, 'maximum'))?.githubStars).toBe(Number.MAX_SAFE_INTEGER);
+    const backup = await exportData(store);
+    await importData(store, toParsedBackup(backup), 'replace');
+    expect((await getItem(store, 'maximum'))?.githubStars).toBe(Number.MAX_SAFE_INTEGER);
   });
 
   it('atomically allows only one first-login admin creation', async () => {

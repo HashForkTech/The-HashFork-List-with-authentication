@@ -29,7 +29,7 @@ function item(patch: Partial<ListItem> & { id: string }): ListItem {
     youtubeUrl: null,
     tested: false,
     testedAt: null,
-    rating: 0,
+    githubStars: null,
     comment: null,
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
@@ -312,6 +312,24 @@ describe('Directory — URL round-trip', () => {
   });
 });
 
+describe('GitHub star count display', () => {
+  it('shows GitHub, one yellow star and the full count, including zero; hides absent counts', () => {
+    const { container } = render(
+      <>
+        <ItemRow item={item({ id: 'popular', githubStars: 12345 })} />
+        <ItemRow item={item({ id: 'zero', githubStars: 0 })} />
+        <ItemRow item={item({ id: 'missing', githubStars: null })} />
+      </>,
+    );
+    const badge = screen.getByRole('img', { name: 'GitHub: 12345 stars' });
+    expect(badge.textContent).toBe('GitHub12345');
+    expect(badge.querySelectorAll('svg')).toHaveLength(1);
+    expect(badge.querySelector('svg')?.classList.contains('fill-yellow-400')).toBe(true);
+    expect(screen.getByRole('img', { name: 'GitHub: 0 stars' })).toBeTruthy();
+    expect(container.querySelector('#item-missing [role="img"]')).toBeNull();
+  });
+});
+
 describe('Directory — sorting', () => {
   it('re-orders the rows by name (A–Z)', () => {
     renderDirectory();
@@ -319,17 +337,19 @@ describe('Directory — sorting', () => {
     expect(visibleNames()).toEqual(['Docker bench', 'Notepad', 'Ollama', 'Trivy']);
   });
 
-  it('re-orders the rows by rating (best first)', () => {
+  it('re-orders by GitHub stars numerically, with absent counts after zero', () => {
     render(
       <Directory categories={categories}>
-        <ItemRow item={item({ id: 'a', name: 'Two stars', rating: 2 })} />
-        <ItemRow item={item({ id: 'b', name: 'Five stars', rating: 5 })} />
-        <ItemRow item={item({ id: 'c', name: 'One star', rating: 1 })} />
+        <ItemRow item={item({ id: 'a', name: 'Thousands', githubStars: 2000 })} />
+        <ItemRow item={item({ id: 'b', name: 'Popular', githubStars: 50000 })} />
+        <ItemRow item={item({ id: 'c', name: 'Small', githubStars: 12 })} />
+        <ItemRow item={item({ id: 'd', name: 'Missing', githubStars: null })} />
+        <ItemRow item={item({ id: 'e', name: 'Zero', githubStars: 0 })} />
       </Directory>,
     );
-    expect(visibleNames()).toEqual(['Two stars', 'Five stars', 'One star']); // default: newest
-    fireEvent.change(screen.getByLabelText('Sort resources'), { target: { value: 'rating' } });
-    expect(visibleNames()).toEqual(['Five stars', 'Two stars', 'One star']);
+    expect(visibleNames()).toEqual(['Thousands', 'Popular', 'Small', 'Missing', 'Zero']);
+    fireEvent.change(screen.getByLabelText('Sort resources'), { target: { value: 'githubStars' } });
+    expect(visibleNames()).toEqual(['Popular', 'Thousands', 'Small', 'Zero', 'Missing']);
   });
 });
 
