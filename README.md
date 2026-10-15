@@ -2,7 +2,7 @@
 
 A directory of curated resources: GitHub projects, LLMs, models and AI tools. It comes with a clean public list and a protected admin screen. Run it with SQLite on your own Node.js server or Docker, or with Supabase Postgres on Vercel.
 
-**Looking for local deployment without authentication?** The same app is also available without authentication for local deployment: [The HashFork List — without authentication](https://the-list.hashfork.tech/).
+**Looking for local deployment without authentication?** The same app is also available without authentication for local deployment: [The HashFork List — without authentication](https://github.com/HashForkTech/The-HashFork-List).
 
 **Customize your list name:** Open `/admin`, change **Page title** under **Main page**, and click **Save**.
 
@@ -18,7 +18,7 @@ A directory of curated resources: GitHub projects, LLMs, models and AI tools. It
 
 **Public list** (`/`)
 
-- Resources grouped by category, each with a name, description, links, a category chip and review metadata.
+- Resources with category filtering, each with a name, description, links, a category chip and review metadata.
 - Links are shown as icons: GitHub, website, Hugging Face, YouTube.
 - A "Tested" badge with the date it was checked, a manually entered GitHub star count displayed as GitHub, one yellow star and the full number, and an optional comment behind a "Comment" button (tap- and keyboard-friendly). Blank counts are hidden; zero is shown.
 - Filter bar: category, Tested / Non-tested, and a case-insensitive search over name, description and comment. All three combine, and a sort control orders the list by newest, name or GitHub star count.
@@ -31,7 +31,7 @@ A directory of curated resources: GitHub projects, LLMs, models and AI tools. It
 - Change the list name (main page title), manage categories and resources, and export or import data.
 - Select a category from a dropdown to see its resource count and use the existing Rename and Delete buttons.
 - Enter an optional non-negative whole number under GitHub stars when adding or editing a resource.
-- Same filter bar as the public list.
+- Category, tested status and search filters shared with the public list.
 - Forms refuse to close with unsaved changes: you get **Save / Discard changes / Keep editing**.
 - Deleting a category keeps its resources (they simply become uncategorized).
 
@@ -134,6 +134,7 @@ For production hosting, follow [Deployment](#deployment) and [the detailed deplo
 | `npm run typecheck`    | Type check only (`tsc --noEmit`)                   |
 | `npm test`             | Run the test suite once (Vitest)                   |
 | `npm run test:watch`   | Run tests in watch mode                            |
+| `npm run db:migrate:supabase` | Apply all Supabase SQL migrations; requires `DATABASE_URL` in the process environment |
 
 ## Environment variables
 
@@ -143,14 +144,14 @@ Copy `.env.example` to `.env` for local hosting. Configure the same values as se
 | --- | --- | --- |
 | `DATABASE_PROVIDER` | `sqlite` | `sqlite` for local/Docker storage; `supabase` for Supabase Postgres. |
 | `DATABASE_URL` | none | Required for Supabase; server-only Postgres connection string. |
-| `DATABASE_CA_CERT` | none | Optional file containing the trusted database root CA for TLS verification. |
+| `DATABASE_CA_CERT` | none | Trusted database root CA file for TLS verification; set `./deploy/supabase-ca.txt` for the bundled Supabase CA on Vercel. |
 | `DATA_DIR` | `./data` | SQLite directory; requires persistent storage in production. |
 | `DATABASE_FILE` | `hashfork.sqlite` | SQLite filename inside `DATA_DIR`. |
 | `ADMIN_SETUP_TOKEN` | none | Random first-login setup secret, at least 32 characters. Setup closes after the first password is created. |
 | `AUTH_ENCRYPTION_KEY` | none | Required base64-encoded 32-byte random key for setup and TOTP encryption. Keep it with your deployment secrets and preserve it for database restores. |
 | `AUTH_SESSION_MINUTES` | `60` | Maximum admin session lifetime in minutes. |
 | `APP_URL` | `http://localhost:3000` | Public origin; use your actual HTTPS URL in production. |
-| `TRUST_PROXY` | see `.env.example` | Required for production admin access; enable only behind a controlled HTTPS proxy that overwrites forwarded IP/host/protocol headers. |
+| `TRUST_PROXY` | `false` | Required for production admin access; enable only behind a controlled HTTPS proxy that overwrites forwarded IP/host/protocol headers. |
 | `ENABLE_HSTS` | `false` | Enable after configuring a trusted production HTTPS certificate; keep disabled for self-signed localhost tests. |
 
 No auth or database secret may have a `NEXT_PUBLIC_` prefix. Session tokens are held only in browser memory; refreshing or reopening the page requires sign-in.
@@ -185,7 +186,7 @@ Authentication uses a random bearer session sent in the `Authorization` header, 
 
 The admin can enable optional TOTP 2FA with an authenticator app. Scan the setup QR code and confirm a generated code before activation. Keep the one-time recovery codes somewhere safe outside the app. Once enabled, login also requires a code; changing or disabling 2FA requires confirmation.
 
-The content-management screen contains the main page title, categories, resources and backup tools. Two behaviours worth knowing:
+The dashboard contains the main page title, categories, resources, backup tools and Security settings for changing the password and managing 2FA. Two behaviours worth knowing:
 
 - **Filtering.** The Resources section carries the same filter bar as the public list: category, Tested / Non-tested, and substring search, all combinable.
 - **Nothing is lost by accident.** Closing a category or resource form, switching to another resource, or navigating away while the form differs from what is saved opens a dialog: **Save**, **Discard changes** or **Keep editing**. The comparison is against the saved values, so typing something and then reverting it never warns you. A native browser prompt guards a tab close or reload.
@@ -289,11 +290,11 @@ The image starts the Next.js standalone server (`node server.js`) and includes t
 
 ### Vercel with Supabase
 
-Select Next.js and Node 24 in Vercel. `vercel.json` supplies the installation command `npm ci --ignore-scripts` and the build command `npm run build`. Set `DATABASE_PROVIDER=supabase`, a server-only Supabase transaction-pooler `DATABASE_URL`, the auth secrets, your HTTPS `APP_URL`, and `TRUST_PROXY=true`. Apply the supplied Postgres migration before use.
+Select Next.js and Node 24 in Vercel. `vercel.json` supplies the installation command `npm ci --ignore-scripts`, the build command `npm run build`, and the Paris function region (`cdg1`). Set `DATABASE_PROVIDER=supabase`, a server-only Supabase transaction-pooler `DATABASE_URL`, `DATABASE_CA_CERT=./deploy/supabase-ca.txt`, the auth secrets, your HTTPS `APP_URL`, and `TRUST_PROXY=true`. The bundled public root CA is included in every server function for verified database TLS. Apply all supplied Postgres migrations in filename order before deploying this version, including the GitHub stars migration.
 
 Do not use SQLite on Vercel: local serverless storage is not the persistent database. Supabase holds content, sessions and authentication state across instances and redeployments. Use separate databases and auth secrets for preview and production deployments.
 
-See [the detailed deployment guide](docs/deployment.md#vercel-and-supabase) for migration, TLS, connection pooling and verification steps.
+See [the detailed deployment guide](docs/deployment.md#vercel-and-supabase) for migration, TLS, connection pooling and verification steps. The [recorded Vercel launch](docs/vercel-launch.md) contains historical project and DNS details; it does not verify the current production version.
 
 ### Node.js server or VPS
 
@@ -326,15 +327,18 @@ app/
   api/                          Auth, health and content / backup REST endpoints
 components/
   Header.tsx, Directory.tsx, ItemRow.tsx
+  GitHubStars.tsx               GitHub label, one yellow star and saved count
   ResourceFilters.tsx           Filter bar shared by public list and admin
   DescriptionText.tsx           Two-line description + full-text tooltip
   CommentButton.tsx             Comment popover button (tap and keyboard friendly)
   SkipLink.tsx                  Keyboard "skip to content" link
   LinkIcons.tsx, BrandIcon.tsx  Per-link icons (GitHub, web, Hugging Face, YouTube)
   admin/                        AdminDashboard, ItemForm, DataTools,
-                                ConfirmDialog, UnsavedChangesDialog, AdminLayout
+                                ConfirmDialog, UnsavedChangesDialog, AdminLayout,
+                                AuthGate, SecuritySettings
 lib/
   types.ts                      Domain types shared by storage, API and UI
+  auth/                         Password, session and optional 2FA services
   db/                           SQLite / Postgres clients, schema and repositories
   db/repositories/              categories, items, settings (the data-access layer)
   http/                         api response helpers, cross-origin mutation check + guard
@@ -346,6 +350,11 @@ lib/
   api/admin-client.ts           Typed fetch client used by the admin UI
 middleware.ts                   Security headers and CSP
 tests/                          Vitest suite (unit tests + jsdom UI tests)
+scripts/migrate-supabase.mjs    Apply all Supabase SQL migrations in order
+supabase/migrations/            Postgres content and authentication schema
+deploy/supabase-ca.txt          Public Supabase root CA bundled for database TLS
+docs/deployment.md              Hosting and authentication setup
+docs/vercel-launch.md           Historical production setup record
 docs/screenshots/               Images used in this README
 data/                           SQLite database, created at runtime, git-ignored
 ```
@@ -378,7 +387,7 @@ Use Node.js 22.22.2 or Node 24 and run `npm ci --ignore-scripts` on the target o
 `DATA_DIR` is not writable. Point it at a writable path that also survives restarts.
 
 **My data disappeared after a redeploy.**
-Your platform's filesystem is ephemeral; see [Platform warnings](#platform-warnings).
+Use Supabase for durable storage on Vercel, or preserve the SQLite `DATA_DIR` directory or Docker volume across deployments. See [Deployment](#deployment).
 
 ## License
 

@@ -5,6 +5,8 @@ const nextConfig = {
   serverExternalPackages: ['better-sqlite3', '@node-rs/argon2'],
   // Emits .next/standalone for container deployments (see README).
   output: 'standalone',
+  // Supabase's public root CA must be included in every server function.
+  outputFileTracingIncludes: { '/*': ['./deploy/supabase-ca.txt'] },
   poweredByHeader: false,
   reactStrictMode: true,
   images: { unoptimized: true },

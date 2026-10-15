@@ -1,0 +1,14 @@
+.git
+.vercel
+node_modules
+.next
+.dsh-artifacts
+certificates
+data
+.env*
+*.key
+*.pem
+*.crt
+*.p12
+*.pfx
+*.tsbuildinfo

@@ -13,8 +13,8 @@ next-env.d.ts
 /data
 
 # env files
-.env
-.env*.local
+.env*
+!.env.example
 
 # misc
 .DS_Store
@@ -34,3 +34,6 @@ npm-debug.log*
 *.crt
 *.p12
 *.pfx
+
+# local Vercel project metadata
+/.vercel/

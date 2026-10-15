@@ -91,7 +91,7 @@ This helper changes only the mounted `/data` application volume; normal startup 
 ## Vercel and Supabase
 
 1. Create a Supabase project and apply every SQL file in `supabase/migrations/` in filename order before sending app traffic to it. Paste the SQL into the Supabase SQL editor, or set DATABASE_URL in an ignored local .env and run `node --env-file=.env scripts/migrate-supabase.mjs` using a migration connection. Take a database backup before updating an existing deployment.
-2. Import the repository into Vercel using the Next.js preset. The committed `vercel.json` automatically selects `npm ci --ignore-scripts` for installation and `npm run build` for the build.
+2. Import the repository into Vercel using the Next.js preset. The committed `vercel.json` automatically selects `npm ci --ignore-scripts` for installation and `npm run build` for the build, and pins functions to Paris (`cdg1`).
 3. Select the Node.js runtime, preferably Node 24. Native SQLite and Argon2 packages require Node; do not move the backend to the Edge runtime. [Vercel's supported Node versions](https://vercel.com/docs/functions/runtimes/node-js/node-js-versions) include Node 24.
 4. Set the server-only variables below for the intended deployment environment.
 5. Deploy, run the checks below, and complete first-login setup at the deployed `/admin`.
@@ -100,6 +100,7 @@ This helper changes only the mounted `/data` application volume; normal startup 
 | --- | --- |
 | `DATABASE_PROVIDER` | `supabase` |
 | `DATABASE_URL` | Supabase Postgres transaction-pooler connection string |
+| `DATABASE_CA_CERT` | `./deploy/supabase-ca.txt` for the bundled Supabase root CA |
 | `ADMIN_SETUP_TOKEN` | Independent random setup secret, at least 32 characters |
 | `AUTH_ENCRYPTION_KEY` | Base64 encoding of 32 random bytes |
 | `AUTH_SESSION_MINUTES` | `60`, or your chosen session lifetime |
@@ -107,7 +108,7 @@ This helper changes only the mounted `/data` application volume; normal startup 
 | `TRUST_PROXY` | `true` |
 | `ENABLE_HSTS` | `true` after validating the production domain's HTTPS |
 
-Copy the **Transaction pooler** URL from Supabase's Connect dialog, normally on port `6543`; do not guess its hostname. URL-encode any special characters in the database password. The connection verifies TLS. If needed, set `DATABASE_CA_CERT` to a file containing the trusted database root CA; never disable TLS verification in production. The pg adapter limits each warm process to one connection and uses unnamed parameterized queries. Each warm Vercel instance has its own one-connection pool; monitor total database connection capacity as traffic scales. [Supabase connection guidance](https://supabase.com/docs/guides/database/connecting-to-postgres)
+Copy the **Transaction pooler** URL from Supabase's Connect dialog, normally on port `6543`; do not guess its hostname. URL-encode any special characters in the database password. The connection verifies TLS. Set `DATABASE_CA_CERT=./deploy/supabase-ca.txt` to use the bundled public Supabase root CA. `next.config.mjs` includes it in every server function. If your database uses a different CA, supply its trusted root instead; keep TLS verification enabled. The pg adapter limits each warm process to one connection and uses unnamed parameterized queries. Each warm Vercel instance has its own one-connection pool; monitor total database connection capacity as traffic scales. [Supabase connection guidance](https://supabase.com/docs/guides/database/connecting-to-postgres)
 
 Supabase Auth is not used for this app's single admin. Supabase supplies the Postgres database. Keep authentication records in private database tables and grant no browser/anonymous access to them. The frontend calls this app's API; it does not need a Supabase publishable key.
 
